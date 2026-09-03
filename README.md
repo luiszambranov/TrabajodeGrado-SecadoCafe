@@ -41,7 +41,7 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Matriz comparativa de 4-5 modelos de secado con fuentes.
 - [x] Selección preliminar de línea base solar y alternativa activa.
 - [x] Diagrama de arquitectura Python-CODESYS-FluidSIM.
-- [x] Prueba mínima de comunicación (OPC UA) o informe de limitación/licencia.
+- [ ] Prueba mínima de comunicación (OPC UA listo) o informe de limitación/licencia. (Falta trabajar sobre comunicacion con phyton)
 - [ ] Primer script Python que reproduzca una curva de secado.
 - [ ] Ficha de inspección de la secadora física.
 
