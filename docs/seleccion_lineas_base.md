@@ -85,7 +85,4 @@ consistente con la recomendación de complejidad de la guía operativa.
 6. Mathematical modeling of greenhouse solar dryers with natural and forced convection for agricultural products: state of the art. https://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S2007-40262017000100019
 7. Design and optimization of an active and passive mode indirect solar dryer to improve energy efficiency and sustainability. *International Journal of Low-Carbon Technologies.* https://academic.oup.com/ijlct/article/doi/10.1093/ijlct/ctag056/8703217
 
-## 5. Pendiente para la próxima asesoría
 
-- Validar con el asesor el rango de temperatura objetivo sobre ambiente para la línea base activa.
-- Confirmar si el clima/región del proyecto justifica un valor específico dentro de los rangos reportados.
