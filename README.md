@@ -52,5 +52,3 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 | Estudiante B | CODESYS, máquina de estados, PID, alarmas/HMI, FluidSIM, comunicaciones, integración, arquitectura IoT y costos de automatización. |
 | Trabajo conjunto | Secadora física, líneas base, diseño experimental, integración final, documento, APA, sustentación y revisión cruzada. |
 
-**Regla de equipo:** cada estudiante debe poder explicar el trabajo del otro. Una vez por
-semana deben hacer revisión cruzada y dejar evidencia de qué verificó cada uno.
