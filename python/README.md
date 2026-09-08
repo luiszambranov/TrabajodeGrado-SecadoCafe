@@ -26,17 +26,32 @@ Modelo de la planta (Python) y procesamiento de resultados.
 - `AjusteModelos.ipynb` — notebook que corre el ajuste, tabula
   R²/RMSE/MAE de los tres modelos, comprueba que Midilli modificado
   recupera los parámetros publicados, y grafica la comparación.
+- `generador_ambiente.py` — generador de temperatura y humedad relativa
+  ambiente (nominal y perturbado), con la Estación Naranjal (Cenicafé,
+  Chinchiná, Caldas) como zona climática de referencia. HR derivada de T
+  con un enfoque psicrométrico simple (presión de vapor aprox. constante
+  en el día). Ver docstring para las simplificaciones de este v0.1.
+- `GeneradorAmbiente.ipynb` — notebook que genera y grafica el ciclo
+  diurno nominal y varios días perturbados de T/HR.
+- `linea_base_activa.py` — modelo de la línea base activa (secado solar
+  + ventilación forzada): modelo Logarítmico con los parámetros ya
+  ajustados y publicados por Mackpayen et al. (2017) para un secador
+  solar de convección forzada real (secador Icaro mejorado). Ver
+  `data/reference/mackpayen_2017_icaro_dryer.md` para la fuente y la
+  verificación de los parámetros (unidad de tiempo del paper: minutos,
+  convertida a horas en el código).
+- `LineaBaseActiva.ipynb` — notebook que grafica la curva de la línea
+  base activa y una comparación preliminar contra Midilli modificado.
 
 Contenido esperado (pendiente):
 - Modelo térmico/energético concentrado (balance de aire, producto, pérdidas,
   potencia de calentamiento/ventilación).
-- Generador de perturbaciones ambientales (T y HR ambiente, nominal y
-  perturbado) — puede apoyarse en las ecuaciones generalizadas de la
-  Tabla 3 del paper (`data/reference/phitakwinai_2019_tabla3_ecuaciones_generalizadas.md`).
+- Escenario de secado al sol en lazo abierto (línea base mínima).
 - Scripts de campaña Monte Carlo.
 - Cliente de comunicación (OPC UA u otra interfaz soportada) con CODESYS.
 
 Entregable semana 4: primer script que reproduzca una curva de secado. ✅
 Entregable semana 5: modelo Python v0.1 con unidades y parámetros
 documentados. ✅ Ajuste de modelos candidatos con RMSE/MAE/R². ✅
-Reproducción de datos/curva de literatura. ✅
+Reproducción de datos/curva de literatura. ✅ Generador de T/HR ambiente
+nominal y perturbado. ✅ Primera línea base activa. ✅

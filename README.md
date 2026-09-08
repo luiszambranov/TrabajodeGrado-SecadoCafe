@@ -50,8 +50,8 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Ajuste de modelos candidatos con RMSE, MAE y R². (`python/ajuste_modelos.py` + `python/AjusteModelos.ipynb`: ajuste no lineal de los 3 modelos contra la curva de referencia de Phitakwinai et al. 2019, T=60°C/RH=20%; Midilli modificado recupera los parámetros publicados con R²≈1)
 - [x] Reproducción de datos/curva de literatura. (Tabla 2 completa del paper digitalizada en `data/reference/phitakwinai_2019_tabla2_parametros.csv`; curva de referencia generada con la ecuación ya publicada y validada por los autores)
 - [ ] Escenario de secado al sol en lazo abierto.
-- [ ] Primera línea base activa (código).
-- [ ] Generador de T ambiente/HR ambiente nominal y perturbado.
+- [x] Primera línea base activa (código). (`python/linea_base_activa.py` + `python/LineaBaseActiva.ipynb`: modelo Logarítmico con parámetros reales de Mackpayen et al. 2017, secador solar Icaro mejorado, verificados contra el PDF original)
+- [x] Generador de T ambiente/HR ambiente nominal y perturbado. (`python/generador_ambiente.py` + `python/GeneradorAmbiente.ipynb`: ciclo diurno de T y HR con la Estación Naranjal, Cenicafé, Chinchiná/Caldas como referencia climática; enfoque psicrométrico simple para HR a partir de T)
 - [ ] Primera estimación de energía.
 - [ ] Puerta física: datos que realmente podrían obtenerse.
 
