@@ -49,7 +49,7 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Modelo Python v0.1 con unidades y parámetros documentados. (`python/modelo_secado.py`: Newton, Logarítmico y Midilli modificado, con docstrings de unidades y procedencia de cada parámetro; parámetros aún preliminares, no ajustados)
 - [x] Ajuste de modelos candidatos con RMSE, MAE y R². (`python/ajuste_modelos.py` + `python/AjusteModelos.ipynb`: ajuste no lineal de los 3 modelos contra la curva de referencia de Phitakwinai et al. 2019, T=60°C/RH=20%; Midilli modificado recupera los parámetros publicados con R²≈1)
 - [x] Reproducción de datos/curva de literatura. (Tabla 2 completa del paper digitalizada en `data/reference/phitakwinai_2019_tabla2_parametros.csv`; curva de referencia generada con la ecuación ya publicada y validada por los autores)
-- [ ] Escenario de secado al sol en lazo abierto.
+- [x] Escenario de secado al sol en lazo abierto. (`python/escenario_sol_abierto.py` + `python/EscenarioSolAbierto.ipynb`: modelo Newton calibrado con condiciones reales de secado en patio, T=26.3°C/HR=63.3%/117.5h — ver limitación documentada sobre la tabla de parámetros Page no verificada)
 - [x] Primera línea base activa (código). (`python/linea_base_activa.py` + `python/LineaBaseActiva.ipynb`: modelo Logarítmico con parámetros reales de Mackpayen et al. 2017, secador solar Icaro mejorado, verificados contra el PDF original)
 - [x] Generador de T ambiente/HR ambiente nominal y perturbado. (`python/generador_ambiente.py` + `python/GeneradorAmbiente.ipynb`: ciclo diurno de T y HR con la Estación Naranjal, Cenicafé, Chinchiná/Caldas como referencia climática; enfoque psicrométrico simple para HR a partir de T)
 - [ ] Primera estimación de energía.

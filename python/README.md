@@ -42,11 +42,21 @@ Modelo de la planta (Python) y procesamiento de resultados.
   convertida a horas en el código).
 - `LineaBaseActiva.ipynb` — notebook que grafica la curva de la línea
   base activa y una comparación preliminar contra Midilli modificado.
+- `escenario_sol_abierto.py` — línea base mínima (secado al sol en
+  patio, lazo abierto): modelo Newton calibrado con las condiciones
+  generales (T, HR, tiempo total, humedad inicial/final) de un estudio
+  real de secado de café en patio. Ver
+  `data/reference/eliseu_2008_secado_patio.md` para la fuente y la
+  limitación explícita (calibración de 2 puntos, no un reajuste
+  completo — no se pudo verificar la tabla de parámetros originales del
+  modelo Page).
+- `EscenarioSolAbierto.ipynb` — notebook que grafica la línea base
+  mínima y compara las tres estrategias (mínima, activa, propuesta
+  supervisada) en la misma ventana de tiempo.
 
 Contenido esperado (pendiente):
 - Modelo térmico/energético concentrado (balance de aire, producto, pérdidas,
   potencia de calentamiento/ventilación).
-- Escenario de secado al sol en lazo abierto (línea base mínima).
 - Scripts de campaña Monte Carlo.
 - Cliente de comunicación (OPC UA u otra interfaz soportada) con CODESYS.
 
@@ -54,4 +64,5 @@ Entregable semana 4: primer script que reproduzca una curva de secado. ✅
 Entregable semana 5: modelo Python v0.1 con unidades y parámetros
 documentados. ✅ Ajuste de modelos candidatos con RMSE/MAE/R². ✅
 Reproducción de datos/curva de literatura. ✅ Generador de T/HR ambiente
-nominal y perturbado. ✅ Primera línea base activa. ✅
+nominal y perturbado. ✅ Primera línea base activa. ✅ Escenario de secado
+al sol en lazo abierto. ✅
