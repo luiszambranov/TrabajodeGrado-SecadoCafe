@@ -41,9 +41,19 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Matriz comparativa de 4-5 modelos de secado con fuentes.
 - [x] Selección preliminar de línea base solar y alternativa activa.
 - [x] Diagrama de arquitectura Python-CODESYS-FluidSIM.
-- [ ] Prueba mínima de comunicación (OPC UA listo) o informe de limitación/licencia. (Falta trabajar sobre comunicacion con phyton)
-- [ ] Primer script Python que reproduzca una curva de secado.
+- [ ] Prueba mínima de comunicación (OPC UA listo) o informe de limitación/licencia. (Falta trabajar sobre comunicacion con phyton; hay una prueba de conexión CODESYS-FluidSIM, `codesys/ConcexionOPC.png`, pendiente de formalizar)
+- [x] Primer script Python que reproduzca una curva de secado. (`python/CurvaSecado.ipynb`, modelo de Newton)
 - [ ] Ficha de inspección de la secadora física.
+
+## Estado — Semana 5 (Modelo base validado)
+- [x] Modelo Python v0.1 con unidades y parámetros documentados. (`python/modelo_secado.py`: Newton, Logarítmico y Midilli modificado, con docstrings de unidades y procedencia de cada parámetro; parámetros aún preliminares, no ajustados)
+- [ ] Ajuste de modelos candidatos con RMSE, MAE y R².
+- [ ] Reproducción de datos/curva de literatura.
+- [ ] Escenario de secado al sol en lazo abierto.
+- [ ] Primera línea base activa (código).
+- [ ] Generador de T ambiente/HR ambiente nominal y perturbado.
+- [ ] Primera estimación de energía.
+- [ ] Puerta física: datos que realmente podrían obtenerse.
 
 ## Roles
 | Rol | Responsabilidad principal |
