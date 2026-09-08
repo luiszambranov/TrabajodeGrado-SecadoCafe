@@ -53,10 +53,18 @@ Modelo de la planta (Python) y procesamiento de resultados.
 - `EscenarioSolAbierto.ipynb` — notebook que grafica la línea base
   mínima y compara las tres estrategias (mínima, activa, propuesta
   supervisada) en la misma ventana de tiempo.
+- `estimacion_energia.py` — primera estimación de energía: calor
+  latente MÍNIMO (piso termodinámico) para evaporar el agua removida en
+  cada una de las tres estrategias. No es el consumo real (falta
+  electricidad de ventiladores, pérdidas térmicas, efecto de sorción);
+  ver el docstring del módulo para el detalle completo de supuestos.
+- `EstimacionEnergia.ipynb` — notebook que tabula la energía para lotes
+  de 1000 y 2500 kg de café húmedo inicial.
 
 Contenido esperado (pendiente):
-- Modelo térmico/energético concentrado (balance de aire, producto, pérdidas,
-  potencia de calentamiento/ventilación).
+- Modelo térmico/energético concentrado completo (balance de aire,
+  producto, pérdidas, potencia de calentamiento/ventilación) — la
+  estimación de energía actual es solo el piso termodinámico.
 - Scripts de campaña Monte Carlo.
 - Cliente de comunicación (OPC UA u otra interfaz soportada) con CODESYS.
 
@@ -65,4 +73,4 @@ Entregable semana 5: modelo Python v0.1 con unidades y parámetros
 documentados. ✅ Ajuste de modelos candidatos con RMSE/MAE/R². ✅
 Reproducción de datos/curva de literatura. ✅ Generador de T/HR ambiente
 nominal y perturbado. ✅ Primera línea base activa. ✅ Escenario de secado
-al sol en lazo abierto. ✅
+al sol en lazo abierto. ✅ Primera estimación de energía. ✅

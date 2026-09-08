@@ -52,8 +52,8 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Escenario de secado al sol en lazo abierto. (`python/escenario_sol_abierto.py` + `python/EscenarioSolAbierto.ipynb`: modelo Newton calibrado con condiciones reales de secado en patio, T=26.3°C/HR=63.3%/117.5h — ver limitación documentada sobre la tabla de parámetros Page no verificada)
 - [x] Primera línea base activa (código). (`python/linea_base_activa.py` + `python/LineaBaseActiva.ipynb`: modelo Logarítmico con parámetros reales de Mackpayen et al. 2017, secador solar Icaro mejorado, verificados contra el PDF original)
 - [x] Generador de T ambiente/HR ambiente nominal y perturbado. (`python/generador_ambiente.py` + `python/GeneradorAmbiente.ipynb`: ciclo diurno de T y HR con la Estación Naranjal, Cenicafé, Chinchiná/Caldas como referencia climática; enfoque psicrométrico simple para HR a partir de T)
-- [ ] Primera estimación de energía.
-- [ ] Puerta física: datos que realmente podrían obtenerse.
+- [x] Primera estimación de energía. (`python/estimacion_energia.py` + `python/EstimacionEnergia.ipynb`: calor latente mínimo de vaporización para las 3 estrategias, ~300-450 kWh/tonelada; explícitamente NO es el consumo real — falta electricidad de ventiladores, pérdidas térmicas y efecto de sorción)
+- [ ] Puerta física: datos que realmente podrían obtenerse. (a cargo del equipo)
 
 ## Roles
 | Rol | Responsabilidad principal |
