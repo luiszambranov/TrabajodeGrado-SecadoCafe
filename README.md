@@ -47,8 +47,8 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 
 ## Estado — Semana 5 (Modelo base validado)
 - [x] Modelo Python v0.1 con unidades y parámetros documentados. (`python/modelo_secado.py`: Newton, Logarítmico y Midilli modificado, con docstrings de unidades y procedencia de cada parámetro; parámetros aún preliminares, no ajustados)
-- [ ] Ajuste de modelos candidatos con RMSE, MAE y R².
-- [ ] Reproducción de datos/curva de literatura.
+- [x] Ajuste de modelos candidatos con RMSE, MAE y R². (`python/ajuste_modelos.py` + `python/AjusteModelos.ipynb`: ajuste no lineal de los 3 modelos contra la curva de referencia de Phitakwinai et al. 2019, T=60°C/RH=20%; Midilli modificado recupera los parámetros publicados con R²≈1)
+- [x] Reproducción de datos/curva de literatura. (Tabla 2 completa del paper digitalizada en `data/reference/phitakwinai_2019_tabla2_parametros.csv`; curva de referencia generada con la ecuación ya publicada y validada por los autores)
 - [ ] Escenario de secado al sol en lazo abierto.
 - [ ] Primera línea base activa (código).
 - [ ] Generador de T ambiente/HR ambiente nominal y perturbado.

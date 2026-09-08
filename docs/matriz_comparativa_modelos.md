@@ -32,6 +32,24 @@ comparando ambos con RMSE/MAE/R² contra el dataset de referencia antes de
 fijar el modelo definitivo, en línea con el criterio de "ajuste" y
 "parsimonia" de la guía operativa.
 
+## Actualización (semana 5) — ajuste realizado
+
+La Tabla 2 completa de Phitakwinai et al. (2019) — parámetros ya
+ajustados de los 9 modelos bajo las 9 condiciones de su diseño
+experimental (T: 50/60/70 °C, RH: 10/20/30 %), con r² y RMSE reportados
+por los autores — quedó digitalizada en
+`data/reference/phitakwinai_2019_tabla2_parametros.csv`. Se usó la
+condición T=60 °C/RH=20 % (mejor r² individual del paper: 0.9997) como
+curva de referencia para ajustar nuestras propias implementaciones de
+Newton, Logarítmico y Midilli modificado (`python/ajuste_modelos.py`,
+`python/AjusteModelos.ipynb`). El resultado confirma la lectura de esta
+matriz: Midilli modificado reproduce la referencia casi exactamente
+(R²≈1), mientras Newton y Logarítmico se desvían visiblemente en las
+colas de la curva. La Tabla 3 del paper (ecuaciones generalizadas de k,
+n, b en función de T y RH) queda disponible en
+`data/reference/phitakwinai_2019_tabla3_ecuaciones_generalizadas.md`
+para el generador de perturbaciones ambientales.
+
 ## Referencias
 
 1. Phitakwinai, S., Thepa, S., & Nilnont, W. (2019). Thin-layer drying of parchment Arabica coffee by controlling temperature and relative humidity. *Food Science & Nutrition, 7*(9), 2921-2931. https://doi.org/10.1002/fsn3.1144
