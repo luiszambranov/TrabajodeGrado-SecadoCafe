@@ -41,7 +41,8 @@ Las semanas 11 y 12 son para corrección, sustentación y radicación, no para c
 - [x] Matriz comparativa de 4-5 modelos de secado con fuentes.
 - [x] Selección preliminar de línea base solar y alternativa activa.
 - [x] Diagrama de arquitectura Python-CODESYS-FluidSIM.
-- [ ] Prueba mínima de comunicación (OPC UA listo) o informe de limitación/licencia. (Falta trabajar sobre comunicacion con phyton; hay una prueba de conexión CODESYS-FluidSIM, `codesys/ConcexionOPC.png`, pendiente de formalizar)
+- [x] Prueba mínima de comunicación. Interfaz elegida: **Modbus TCP** (Python = servidor/slave, CODESYS = cliente/master; ver `codesys/comunicacion_modbus.md`). **Verificada end-to-end el 9-10 sept 2026**: `T_process` y `heater_cmd` confirmados en ambos sentidos entre `python/modbus_server.py` y `codesys/ModbusPhytoon.project` (CODESYS V3.5 SP15). Pendiente: dejar captura/video como evidencia en el repo, y el comportamiento ante pérdida de comunicación. Hay además una prueba de conexión CODESYS-FluidSIM, `codesys/ConcexionOPC.png`, pendiente de formalizar por separado.
+- [ ] HMI en CODESYS (indicadores, tendencia, "pilotos" de actuadores) + más variables simuladas en Python (`fan_cmd`, `RH_ambient`) para la próxima demo — plan detallado en `codesys/comunicacion_modbus.md`, sección 5.
 - [x] Primer script Python que reproduzca una curva de secado. (`python/CurvaSecado.ipynb`, modelo de Newton)
 - [ ] Ficha de inspección de la secadora física.
 
