@@ -61,12 +61,26 @@ Modelo de la planta (Python) y procesamiento de resultados.
 - `EstimacionEnergia.ipynb` — notebook que tabula la energía para lotes
   de 1000 y 2500 kg de café húmedo inicial.
 
+- `modbus_server.py` — **v0** de la comunicación Python-CODESYS.
+  Servidor Modbus TCP (esclavo) que expone `T_process` (float32, °C) en
+  los holding registers 0-1 y recibe `heater_cmd` (0/1) en el registro
+  2. Corre una planta térmica de juguete (primer orden, todavía sin la
+  cinética real de `modelo_secado.py`) solo para demostrar que la
+  comunicación funciona en ambos sentidos. Ver
+  `codesys/comunicacion_modbus.md` para el lado CODESYS (cliente/master)
+  y el procedimiento de prueba completo.
+- `requirements.txt` — dependencias Python del proyecto (`pymodbus`
+  para la comunicación Modbus).
+
 Contenido esperado (pendiente):
 - Modelo térmico/energético concentrado completo (balance de aire,
   producto, pérdidas, potencia de calentamiento/ventilación) — la
   estimación de energía actual es solo el piso termodinámico.
 - Scripts de campaña Monte Carlo.
-- Cliente de comunicación (OPC UA u otra interfaz soportada) con CODESYS.
+- Integrar `modbus_server.py` con `modelo_secado.py` (reemplazar la
+  planta de juguete por la cinética real) y sumar el resto de tags de
+  la tabla de señales (`RH_ambient`, `M_coffee`, `fan_cmd`,
+  `safety_ok`).
 
 Entregable semana 4: primer script que reproduzca una curva de secado. ✅
 Entregable semana 5: modelo Python v0.1 con unidades y parámetros
@@ -74,3 +88,6 @@ documentados. ✅ Ajuste de modelos candidatos con RMSE/MAE/R². ✅
 Reproducción de datos/curva de literatura. ✅ Generador de T/HR ambiente
 nominal y perturbado. ✅ Primera línea base activa. ✅ Escenario de secado
 al sol en lazo abierto. ✅ Primera estimación de energía. ✅
+Prueba mínima de comunicación con CODESYS (Modbus TCP, servidor
+Python): v0 lista en `modbus_server.py`, pendiente evidencia end-to-end
+con CODESYS (ver checklist en `codesys/comunicacion_modbus.md`).

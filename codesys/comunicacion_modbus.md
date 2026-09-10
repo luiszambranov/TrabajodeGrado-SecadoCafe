@@ -1,14 +1,18 @@
-# Comunicación CODESYS ↔ Python vía Modbus TCP — v0 (prueba mínima)
+# Comunicación CODESYS ↔ Python vía Modbus TCP (con HMI) — funcionando end-to-end
 
-**Estado: funcionando end-to-end** (9-10 sept 2026). Este documento
-complementa `python/modbus_server.py`. Ahí está el lado Python
-(servidor); acá está el lado CODESYS (cliente) y el procedimiento de
-prueba. Ver también la guía vigente, sección 3 ("Arquitectura modular
-objetivo") y la "Prueba mínima del corte".
+**Estado: funcionando end-to-end, con HMI.** Verificado y evidenciado
+el 9-10 sept 2026. Este documento complementa `python/modbus_server.py`.
+Ahí está el lado Python (servidor); acá está el lado CODESYS (cliente +
+HMI) y el procedimiento de prueba. Ver también la guía vigente, sección
+3 ("Arquitectura modular objetivo") y la "Prueba mínima del corte".
 
 El proyecto CODESYS que ya funciona está en `codesys/ModbusPhytoon.project`
 (ábrelo con CODESYS **V3.5 SP15 Patch 4** — ver la sección 0 sobre por qué
-la versión importa).
+la versión importa). Evidencia visual en `codesys/evidencia_hmi_modbus.png`:
+el HMI de CODESYS (temperatura + piloto del calentador) y la consola de
+`modbus_server.py` mostrando exactamente los mismos valores al mismo
+tiempo — esa es la prueba de que la comunicación es real, no simulada
+por separado en cada lado.
 
 ## 0. Tres errores que costaron horas — lee esto antes de reproducir
 
@@ -61,6 +65,25 @@ estos tres puntos fueron el 90% del tiempo perdido la primera vez:
    ciérralo (`taskkill /F /IM python.exe` mata todos los procesos de
    Python — úsalo solo si no tienes otra cosa importante corriendo en
    Python al mismo tiempo).
+
+4. **En el HMI (Visualization), un elemento "Lámpara" solo acepta una
+   variable BOOL, no un WORD.** `heater_cmd` es WORD (0/1), así que
+   intentar conectarlo directo a la propiedad "Variable" de la lámpara
+   da el error `C0032: ... no puede convertirse en el tipo 'POINTER TO
+   BOOL'`. Solución: agregar una variable BOOL auxiliar en `PLC_PRG`
+   (`heater_on : BOOL;`) y calcularla en el cuerpo del programa
+   (`heater_on := (heater_cmd = 1);`), y conectar la lámpara a
+   `PLC_PRG.heater_on` en vez de a `heater_cmd` directamente.
+
+5. **Para meter un valor numérico en vivo dentro de un texto del HMI**
+   (ej. `T_process: %.1f`), la variable va en la sección **"Variables
+   de texto"** del panel de propiedades del elemento "Campo de texto"
+   — específicamente en el campo que se llama igual que la sección
+   (`Variables de texto` → `Variables de texto`). **No** va en
+   "Textos dinámicos → Lista de texto": ese campo es para mapear un
+   entero a una lista de textos fijos (como un enum), y si le pones
+   ahí una variable REAL da el error `C0032: El tipo 'REAL' no puede
+   convertirse en el tipo 'STRING'`.
 
 ## 1. Arquitectura y roles
 
@@ -209,29 +232,27 @@ Copiado de la guía vigente:
       el canal en error/timeout; falta definir y programar un valor
       seguro explícito (por ejemplo, `heater_cmd := 0` y una alarma)
       cuando eso ocurra.
-- [ ] Evidencia en el repositorio (captura de pantalla o video del
-      Watch/Trace de CODESYS junto con la consola de `modbus_server.py`
-      mostrando los mismos valores) — **pendiente subir el archivo**,
-      aunque ya se verificó en vivo.
+- [x] Evidencia en el repositorio: `codesys/evidencia_hmi_modbus.png`
+      — captura del HMI de CODESYS (`T_process: 44.2`, piloto del
+      calentador encendido) junto a la consola de `modbus_server.py`
+      mostrando `T_process= 44.25 degC | heater_cmd=1` en el mismo
+      instante (10 sept 2026).
 
-## 5. Plan para la siguiente sesión (mostrar algo más completo)
+## 5. HMI en CODESYS — hecho
 
-Objetivo: pasar de "dos números que coinciden" a algo demostrable con
-una interfaz, para la reunión con el profe.
+Se agregó una Visualization (`HMI_Secado`) con:
+- Un campo de texto mostrando `T_process` en vivo (formato `%.1f`).
+- Una lámpara ("Lámpara") que se enciende cuando `heater_cmd = 1`
+  (vía la variable auxiliar `heater_on`, ver sección 0.4).
 
-1. **HMI en CODESYS.** Agregar una Visualization (clic derecho en
-   `Application` → `Add Object` → `Visualization`). Mínimo:
-   - Un indicador numérico o gauge de `T_process`.
-   - Una gráfica de tendencia (Trend) de `T_process` en el tiempo.
-   - Un indicador tipo "piloto" (círculo que cambia de color, con
-     `Text Color`/`Fill Color` condicionados a `heater_cmd = 1`) para
-     el calentador — esto es más vistoso que solo ver un `1`/`0` en una
-     tabla, y es justo lo que pide la guía como "HMI con tendencias,
-     alarmas y estado".
-   - Opcional: un botón para forzar `setpoint` desde el HMI en vez de
-     tenerlo fijo en el código.
+Esto cumple lo que pide la guía como mínimo de "HMI con... estado".
+Pendiente para una siguiente iteración (no bloquea la demo actual):
+una gráfica de tendencia (Trend) de `T_process` en el tiempo, y un
+indicador de alarma cuando se pierde la comunicación (ver sección 6).
 
-2. **Más "pilotos"/salidas en Python.** Para que el HMI tenga más que
+## 6. Plan para la siguiente sesión (subir complejidad)
+
+1. **Más "pilotos"/salidas en Python.** Para que el HMI tenga más que
    mostrar, ampliar `modbus_server.py`:
    - Agregar `fan_cmd` (WORD, dirección 3) como segundo actuador
      simulado, con su propio efecto en la planta de juguete (por
