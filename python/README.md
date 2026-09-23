@@ -61,26 +61,58 @@ Modelo de la planta (Python) y procesamiento de resultados.
 - `EstimacionEnergia.ipynb` — notebook que tabula la energía para lotes
   de 1000 y 2500 kg de café húmedo inicial.
 
-- `modbus_server.py` — **v0** de la comunicación Python-CODESYS.
-  Servidor Modbus TCP (esclavo) que expone `T_process` (float32, °C) en
-  los holding registers 0-1 y recibe `heater_cmd` (0/1) en el registro
-  2. Corre una planta térmica de juguete (primer orden, todavía sin la
-  cinética real de `modelo_secado.py`) solo para demostrar que la
-  comunicación funciona en ambos sentidos. Ver
+- `modbus_server.py` — **v1** de la comunicación Python-CODESYS. Servidor
+  Modbus TCP (esclavo) con interfaz de planta modular (`Plant`) y 7
+  variables: `T_process`, `heater_cmd`, `fan_cmd`, `RH_ambient`,
+  `plant_mode`, `safety_ok` (con watchdog de pérdida de comunicación) y,
+  desde la incorporación del modelo real (ver abajo), `M_coffee`
+  (registros 8-9, float32). Selecciona la planta con `--plant toy`
+  (planta de juguete, default) o `--plant modelo`
+  (`ModeloSecadoPlant`, ver `planta_secado.py`). Ver
   `codesys/comunicacion_modbus.md` para el lado CODESYS (cliente/master)
   y el procedimiento de prueba completo.
-- `requirements.txt` — dependencias Python del proyecto (`pymodbus`
-  para la comunicación Modbus).
+- `dinamica_termica.py` — balance de energía concentrado (lumped) de la
+  cámara: produce `T_process` a partir de `heater_cmd`/`fan_cmd` y la
+  temperatura ambiente. **Esqueleto v0, no calibrado**: los parámetros
+  de `ParametrosCamara` son de orden de magnitud (elegidos para una
+  temperatura de equilibrio plausible, ~55-60°C), pendientes de
+  calibrar contra la ficha técnica de la secadora física de referencia
+  o con el asesor — ver docstring del módulo.
+- `cinetica_dinamica.py` — extiende Midilli modificado
+  (`modelo_secado.py`) a una forma que se puede integrar paso a paso
+  cuando T/RH cambian en el tiempo, usando las ecuaciones generalizadas
+  k(T,RH), n(T,RH), b(T,RH) de la Tabla 3 de Phitakwinai et al. (2019) y
+  el método de "tiempo equivalente" (justificación completa en el
+  docstring del módulo). Válido dentro de T:50-70°C/RH:10-30%; fuera de
+  ese rango marca `fuera_de_rango=True` en vez de fallar. El smoke test
+  del módulo verifica que, con T/RH fijos, este método reproduce
+  exactamente la curva estática ya validada por `ajuste_modelos.py`.
+- `planta_secado.py` — `ModeloSecadoPlant(Plant)`: conecta
+  `dinamica_termica.py` + `cinetica_dinamica.py` + `modelo_secado.py`
+  (conversión MR → `M_coffee`) detrás de la interfaz `Plant` de
+  `modbus_server.py`, reemplazando la planta de juguete. **Esqueleto
+  v0**: antes de usarla para resultados o con CODESYS real falta (ver
+  docstring del módulo) verificar consistencia contra el modelo
+  estático, fijar M0/Me reales del caso de estudio, calibrar
+  `ParametrosCamara`, y decidir el factor de aceleración temporal para
+  las pruebas (hoy 1 s de reloj real = 1 h de modelo, por defecto).
+- `requirements.txt` — dependencias Python del proyecto (`pymodbus`,
+  fijado en `pymodbus==3.6.9`: versiones ≥3.7 cambiaron la ubicación de
+  `ModbusSlaveContext` en `pymodbus.datastore` y rompen `modbus_server.py`).
 
 Contenido esperado (pendiente):
-- Modelo térmico/energético concentrado completo (balance de aire,
-  producto, pérdidas, potencia de calentamiento/ventilación) — la
-  estimación de energía actual es solo el piso termodinámico.
-- Scripts de campaña Monte Carlo.
-- Integrar `modbus_server.py` con `modelo_secado.py` (reemplazar la
-  planta de juguete por la cinética real) y sumar el resto de tags de
-  la tabla de señales (`RH_ambient`, `M_coffee`, `fan_cmd`,
-  `safety_ok`).
+- Calibración de `ParametrosCamara` (dinamica_termica.py) y de
+  `CondicionesSecado` (M0/Me reales) contra la ficha técnica de la
+  secadora física o con el asesor.
+- Verificación de consistencia planta dinámica vs. modelo estático
+  (Etapa 5 del plan de implementación), antes de conectar a CODESYS.
+- Probar `--plant modelo` end-to-end con CODESYS real (watchdog, HMI,
+  timeout del canal master — pendientes de `codesys/comunicacion_modbus.md`,
+  sección 6).
+- Scripts de campaña Monte Carlo (sobre la planta dinámica ya validada).
+- RH_process usa una aproximación psicrométrica simple sin el aporte de
+  vapor del café (efecto de sorción) — ver limitación documentada en
+  `dinamica_termica.py`.
 
 Entregable semana 4: primer script que reproduzca una curva de secado. ✅
 Entregable semana 5: modelo Python v0.1 con unidades y parámetros
@@ -89,5 +121,9 @@ Reproducción de datos/curva de literatura. ✅ Generador de T/HR ambiente
 nominal y perturbado. ✅ Primera línea base activa. ✅ Escenario de secado
 al sol en lazo abierto. ✅ Primera estimación de energía. ✅
 Prueba mínima de comunicación con CODESYS (Modbus TCP, servidor
-Python): v0 lista en `modbus_server.py`, pendiente evidencia end-to-end
-con CODESYS (ver checklist en `codesys/comunicacion_modbus.md`).
+Python): verificada end-to-end con CODESYS real (v1, 6 variables, ver
+`codesys/comunicacion_modbus.md`).
+Esqueleto del modelo real conectado a la interfaz `Plant`
+(`dinamica_termica.py` + `cinetica_dinamica.py` + `planta_secado.py`):
+✅ — pendiente de calibración y de verificación end-to-end con CODESYS
+antes de considerarse un entregable cerrado.

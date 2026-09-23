@@ -152,8 +152,8 @@ REG_FAN_CMD = 3       # 1 registro: 0/1
 REG_RH_AMBIENT = 4    # 2 registros: float32
 REG_PLANT_MODE = 6    # 1 registro: 0=RUN, 1=HOLD
 REG_SAFETY_OK = 7     # 1 registro: 0/1 (publicado por Python)
-# 8-9 reservados para M_coffee (pendiente, ver docstring del módulo)
-NUM_HOLDING_REGS = 20  # margen para variables futuras (M_coffee, etc.)
+REG_M_COFFEE = 8      # 2 registros: float32 (v2 -- ver planta_secado.ModeloSecadoPlant)
+NUM_HOLDING_REGS = 20  # margen para variables futuras
 
 # Direcciones que, al ser escritas por el cliente Modbus (CODESYS), cuentan
 # como "señal de vida" para el watchdog de comunicación.
@@ -226,6 +226,12 @@ class PlantOutputs:
 
     t_process_c: float
     rh_ambient_pct: float
+    m_coffee_pct: float | None = None
+    # M_coffee (contenido de humedad del cafe, % b.h.) -- direcciones
+    # 8-9. Solo lo publican plantas que modelan la cinetica real del
+    # cafe (ver planta_secado.ModeloSecadoPlant); ToyPlant lo deja en
+    # None y el registro Modbus simplemente no se actualiza (ver
+    # bucle_planta).
 
 
 class Plant(abc.ABC):
@@ -326,6 +332,10 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_RH_AMBIENT, float_to_registers(ToyPlant.RH_NOMINAL_PCT))
     slave_ctx.setValues(3, REG_PLANT_MODE, [PLANT_MODE_RUN])
     slave_ctx.setValues(3, REG_SAFETY_OK, [1])
+    # M_coffee: valor inicial 0.0 -- solo tiene significado real cuando
+    # la planta es ModeloSecadoPlant (ver planta_secado.py); con
+    # ToyPlant queda sin usar (nunca se sobreescribe, ver bucle_planta).
+    slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(0.0))
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -357,13 +367,17 @@ def bucle_planta(
         slave_ctx.setValues(3, REG_T_PROCESS, float_to_registers(outputs.t_process_c))
         slave_ctx.setValues(3, REG_RH_AMBIENT, float_to_registers(outputs.rh_ambient_pct))
         slave_ctx.setValues(3, REG_SAFETY_OK, [0 if comm_lost else 1])
+        if outputs.m_coffee_pct is not None:
+            slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(outputs.m_coffee_pct))
 
         estado = "COMM_LOST(valor seguro)" if comm_lost else "OK"
+        m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
         log.info(
-            "T_process=%6.2fC | RH_ambient=%5.1f%% | heater_cmd=%s | fan_cmd=%s | "
+            "T_process=%6.2fC | RH_ambient=%5.1f%% | M_coffee=%s | heater_cmd=%s | fan_cmd=%s | "
             "plant_mode=%s | safety=%s",
             outputs.t_process_c,
             outputs.rh_ambient_pct,
+            m_coffee_str,
             heater_cmd_bruto,
             fan_cmd_bruto,
             plant_mode,
@@ -384,11 +398,39 @@ def main() -> None:
         default=WATCHDOG_TIMEOUT_S,
         help=f"Segundos sin escritura de CODESYS antes de forzar valor seguro (default: {WATCHDOG_TIMEOUT_S})",
     )
+    parser.add_argument(
+        "--plant",
+        choices=["toy", "modelo"],
+        default="toy",
+        help=(
+            "Planta a usar: 'toy' = planta de juguete (default, sin cambios de comportamiento). "
+            "'modelo' = ModeloSecadoPlant (planta_secado.py), cinetica real + dinamica termica -- "
+            "ESQUELETO v0, leer planta_secado.py antes de usarla para resultados o con CODESYS real."
+        ),
+    )
+    parser.add_argument(
+        "--factor-aceleracion",
+        type=float,
+        default=3600.0,
+        help="Solo con --plant modelo: horas de modelo por segundo de reloj real (default: 3600.0, ver planta_secado.py)",
+    )
     args = parser.parse_args()
     WATCHDOG_TIMEOUT_S = args.watchdog_timeout
 
     context, watched_block = construir_contexto()
-    plant: Plant = ToyPlant()
+    if args.plant == "modelo":
+        # Import diferido: planta_secado.py importa de este modulo, asi
+        # que se importa aqui (cuando main() corre, este modulo ya esta
+        # completamente cargado) para evitar un import circular.
+        from planta_secado import ModeloSecadoPlant, ParametrosModeloSecadoPlant
+
+        plant: Plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=args.factor_aceleracion))
+        log.info(
+            "Usando ModeloSecadoPlant (ESQUELETO v0, no calibrado) con factor_aceleracion=%.1f",
+            args.factor_aceleracion,
+        )
+    else:
+        plant: Plant = ToyPlant()
     stop_event = threading.Event()
 
     hilo_planta = threading.Thread(
@@ -401,7 +443,7 @@ def main() -> None:
     log.info("Servidor Modbus TCP escuchando en %s:%s", args.host, args.port)
     log.info(
         "Mapa: hr[0-1]=T_process | hr[2]=heater_cmd | hr[3]=fan_cmd | "
-        "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok"
+        "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2)"
     )
     log.info("Watchdog de comunicación: %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Presiona Ctrl+C para detener.")
