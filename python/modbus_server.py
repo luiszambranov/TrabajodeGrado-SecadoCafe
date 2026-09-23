@@ -152,7 +152,8 @@ REG_FAN_CMD = 3       # 1 registro: 0/1
 REG_RH_AMBIENT = 4    # 2 registros: float32
 REG_PLANT_MODE = 6    # 1 registro: 0=RUN, 1=HOLD
 REG_SAFETY_OK = 7     # 1 registro: 0/1 (publicado por Python)
-REG_M_COFFEE = 8      # 2 registros: float32 (v2 -- ver planta_secado.ModeloSecadoPlant)
+REG_M_COFFEE = 8       # 2 registros: float32 (v2 -- ver planta_secado.ModeloSecadoPlant)
+REG_TIEMPO_PROCESO = 10  # 2 registros: float32, horas de MODELO transcurridas (v2)
 NUM_HOLDING_REGS = 20  # margen para variables futuras
 
 # Direcciones que, al ser escritas por el cliente Modbus (CODESYS), cuentan
@@ -232,6 +233,12 @@ class PlantOutputs:
     # cafe (ver planta_secado.ModeloSecadoPlant); ToyPlant lo deja en
     # None y el registro Modbus simplemente no se actualiza (ver
     # bucle_planta).
+    tiempo_proceso_h: float | None = None
+    # Horas de MODELO transcurridas desde que arranco la planta (NO
+    # segundos de reloj real -- ver factor_aceleracion en
+    # planta_secado.py) -- direcciones 10-11. Pensado para mostrar
+    # "tiempo de secado" en el HMI en vez de fecha/hora del sistema.
+    # Mismo criterio que m_coffee_pct: None -> ToyPlant no lo publica.
 
 
 class Plant(abc.ABC):
@@ -336,6 +343,7 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     # la planta es ModeloSecadoPlant (ver planta_secado.py); con
     # ToyPlant queda sin usar (nunca se sobreescribe, ver bucle_planta).
     slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(0.0))
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -369,12 +377,16 @@ def bucle_planta(
         slave_ctx.setValues(3, REG_SAFETY_OK, [0 if comm_lost else 1])
         if outputs.m_coffee_pct is not None:
             slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(outputs.m_coffee_pct))
+        if outputs.tiempo_proceso_h is not None:
+            slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(outputs.tiempo_proceso_h))
 
         estado = "COMM_LOST(valor seguro)" if comm_lost else "OK"
         m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
+        tiempo_str = f"{outputs.tiempo_proceso_h:6.2f}h" if outputs.tiempo_proceso_h is not None else "    n/a"
         log.info(
-            "T_process=%6.2fC | RH_ambient=%5.1f%% | M_coffee=%s | heater_cmd=%s | fan_cmd=%s | "
-            "plant_mode=%s | safety=%s",
+            "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | M_coffee=%s | heater_cmd=%s | "
+            "fan_cmd=%s | plant_mode=%s | safety=%s",
+            tiempo_str,
             outputs.t_process_c,
             outputs.rh_ambient_pct,
             m_coffee_str,
@@ -443,7 +455,8 @@ def main() -> None:
     log.info("Servidor Modbus TCP escuchando en %s:%s", args.host, args.port)
     log.info(
         "Mapa: hr[0-1]=T_process | hr[2]=heater_cmd | hr[3]=fan_cmd | "
-        "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2)"
+        "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
+        "hr[10-11]=tiempo_proceso_h (v2)"
     )
     log.info("Watchdog de comunicación: %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Presiona Ctrl+C para detener.")

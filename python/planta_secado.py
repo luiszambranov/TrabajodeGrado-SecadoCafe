@@ -127,6 +127,7 @@ class ModeloSecadoPlant(Plant):
             t_process_c=self._t_process,
             rh_ambient_pct=rh_process,  # NOTA: hoy es RH del PROCESO, no del ambiente exterior -- ver TODO abajo
             m_coffee_pct=m_coffee,
+            tiempo_proceso_h=self._t_acumulado_h,
         )
 
 
