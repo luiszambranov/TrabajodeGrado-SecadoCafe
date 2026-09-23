@@ -1,0 +1,15 @@
+# Artefactos de Python (no aportan nada al repositorio, se regeneran solos)
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Checkpoints de Jupyter
+.ipynb_checkpoints/
+
+# Entornos virtuales, si se usan localmente
+.venv/
+venv/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

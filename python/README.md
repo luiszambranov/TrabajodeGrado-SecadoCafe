@@ -66,7 +66,11 @@ Modelo de la planta (Python) y procesamiento de resultados.
   variables: `T_process`, `heater_cmd`, `fan_cmd`, `RH_ambient`,
   `plant_mode`, `safety_ok` (con watchdog de pérdida de comunicación) y,
   desde la incorporación del modelo real (ver abajo), `M_coffee`
-  (registros 8-9, float32). Selecciona la planta con `--plant toy`
+  (registros 8-9, float32) y `tiempo_proceso_h` (registros 10-11,
+  float32 -- horas de MODELO transcurridas, para mostrar "tiempo de
+  secado" en el HMI en vez de fecha/hora del sistema; NO son segundos
+  de reloj real, ver `factor_aceleracion` en `planta_secado.py`).
+  Selecciona la planta con `--plant toy`
   (planta de juguete, default) o `--plant modelo`
   (`ModeloSecadoPlant`, ver `planta_secado.py`). Ver
   `codesys/comunicacion_modbus.md` para el lado CODESYS (cliente/master)
@@ -104,11 +108,13 @@ Contenido esperado (pendiente):
 - Calibración de `ParametrosCamara` (dinamica_termica.py) y de
   `CondicionesSecado` (M0/Me reales) contra la ficha técnica de la
   secadora física o con el asesor.
-- Verificación de consistencia planta dinámica vs. modelo estático
-  (Etapa 5 del plan de implementación), antes de conectar a CODESYS.
-- Probar `--plant modelo` end-to-end con CODESYS real (watchdog, HMI,
-  timeout del canal master — pendientes de `codesys/comunicacion_modbus.md`,
-  sección 6).
+- Verificación rigurosa de consistencia planta dinámica vs. modelo
+  estático (Etapa 5 del plan de implementación) — el smoke test de
+  `cinetica_dinamica.py` ya lo comprueba de forma manual con T/RH
+  fijos, falta automatizarlo como prueba repetible.
+- Prueba del watchdog con CODESYS real deteniendo `modbus_server.py`
+  a mitad de una corrida, y timeout del canal master en CODESYS
+  (pendientes de `codesys/comunicacion_modbus.md`, sección 6).
 - Scripts de campaña Monte Carlo (sobre la planta dinámica ya validada).
 - RH_process usa una aproximación psicrométrica simple sin el aporte de
   vapor del café (efecto de sorción) — ver limitación documentada en
@@ -125,5 +131,13 @@ Python): verificada end-to-end con CODESYS real (v1, 6 variables, ver
 `codesys/comunicacion_modbus.md`).
 Esqueleto del modelo real conectado a la interfaz `Plant`
 (`dinamica_termica.py` + `cinetica_dinamica.py` + `planta_secado.py`):
-✅ — pendiente de calibración y de verificación end-to-end con CODESYS
-antes de considerarse un entregable cerrado.
+✅ — **verificado end-to-end con CODESYS real y HMI el 23 sept 2026**
+(`T_process`, `M_coffee`, `tiempo_proceso_h` en vivo, coincidentes con
+la consola de Python). Sigue pendiente la calibración de
+`ParametrosCamara`/`CondicionesSecado` antes de usar la planta para
+resultados o campañas de la propuesta final.
+Prueba de integración concurrente Modbus (este servidor) + OPC
+(FluidSIM) + lógica de control, sobre el mismo runtime CODESYS Control
+Win V3: ✅ — corrida en paralelo con `modbus_server.py --plant modelo`
+sin conflictos de puerto ni de tiempos (detalle del lado CODESYS/OPC en
+`codesys/`).
