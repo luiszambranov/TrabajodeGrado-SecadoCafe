@@ -62,7 +62,7 @@ Modelo de la planta (Python) y procesamiento de resultados.
   de 1000 y 2500 kg de café húmedo inicial.
 
 - `modbus_server.py` — **v1** de la comunicación Python-CODESYS. Servidor
-  Modbus TCP (esclavo) con interfaz de planta modular (`Plant`) y 7
+  Modbus TCP (esclavo) con interfaz de planta modular (`Plant`) y 8
   variables: `T_process`, `heater_cmd`, `fan_cmd`, `RH_ambient`,
   `plant_mode`, `safety_ok` (con watchdog de pérdida de comunicación) y,
   desde la incorporación del modelo real (ver abajo), `M_coffee`
@@ -70,6 +70,13 @@ Modelo de la planta (Python) y procesamiento de resultados.
   float32 -- horas de MODELO transcurridas, para mostrar "tiempo de
   secado" en el HMI en vez de fecha/hora del sistema; NO son segundos
   de reloj real, ver `factor_aceleracion` en `planta_secado.py`).
+  Desde el 24 sept 2026, además `heartbeat` (registro 12, WORD 0-65535):
+  contador que el servidor incrementa en CADA ciclo, publicado siempre
+  (incluso con comm_lost=True) -- es la señal para que CODESYS detecte
+  que el servidor Python se cayó (watchdog en el sentido contrario al
+  de `safety_ok`, que solo cubre pérdida de escritura de CODESYS hacia
+  Python). Ver docstring del módulo, sección "Señal de latido", y
+  `codesys/comunicacion_modbus.md` para la lógica ST del lado CODESYS.
   Selecciona la planta con `--plant toy`
   (planta de juguete, default) o `--plant modelo`
   (`ModeloSecadoPlant`, ver `planta_secado.py`). Ver
@@ -100,6 +107,17 @@ Modelo de la planta (Python) y procesamiento de resultados.
   estático, fijar M0/Me reales del caso de estudio, calibrar
   `ParametrosCamara`, y decidir el factor de aceleración temporal para
   las pruebas (hoy 1 s de reloj real = 1 h de modelo, por defecto).
+- `metodologia_estadistica_monte_carlo.md` — **diseño definido, no
+  ejecutado (24-25 sept 2026)**: protocolo estadístico para la campaña
+  Monte Carlo de comparación de perfiles térmicos. Fija el diseño como
+  comparación pareada (misma realización de perturbaciones corrida bajo
+  las 3 estrategias), el cálculo del número de realizaciones necesarias
+  vía análisis de potencia estadística (en vez de un número arbitrario),
+  el criterio de convergencia como verificación complementaria, y la
+  corrección de la prueba de comparación final (Wilcoxon pareada en vez
+  de Mann-Whitney, que asume muestras independientes). Responde
+  directamente a la observación del asesor sobre tamaño de muestra
+  (`Informe_revision_documento_secado_cafe.pdf`, sección 5.6).
 - `requirements.txt` — dependencias Python del proyecto (`pymodbus`,
   fijado en `pymodbus==3.6.9`: versiones ≥3.7 cambiaron la ubicación de
   `ModbusSlaveContext` en `pymodbus.datastore` y rompen `modbus_server.py`).
@@ -107,15 +125,19 @@ Modelo de la planta (Python) y procesamiento de resultados.
 Contenido esperado (pendiente):
 - Calibración de `ParametrosCamara` (dinamica_termica.py) y de
   `CondicionesSecado` (M0/Me reales) contra la ficha técnica de la
-  secadora física o con el asesor.
+  secadora física o con el asesor. **Bloqueante** antes del piloto de la
+  campaña Monte Carlo (ver `metodologia_estadistica_monte_carlo.md`).
 - Verificación rigurosa de consistencia planta dinámica vs. modelo
   estático (Etapa 5 del plan de implementación) — el smoke test de
   `cinetica_dinamica.py` ya lo comprueba de forma manual con T/RH
   fijos, falta automatizarlo como prueba repetible.
-- Prueba del watchdog con CODESYS real deteniendo `modbus_server.py`
-  a mitad de una corrida, y timeout del canal master en CODESYS
-  (pendientes de `codesys/comunicacion_modbus.md`, sección 6).
-- Scripts de campaña Monte Carlo (sobre la planta dinámica ya validada).
+- Timeout del canal master en CODESYS (pendiente de
+  `codesys/comunicacion_modbus.md`, sección 6; no bloqueante, `heartbeat`
+  ya cubre el mismo caso).
+- Script de campaña Monte Carlo (sobre la planta dinámica ya validada):
+  protocolo estadístico ya definido en
+  `metodologia_estadistica_monte_carlo.md`; falta la calibración previa
+  y la implementación del script.
 - RH_process usa una aproximación psicrométrica simple sin el aporte de
   vapor del café (efecto de sorción) — ver limitación documentada en
   `dinamica_termica.py`.
