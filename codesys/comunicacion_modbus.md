@@ -1,7 +1,24 @@
 # Comunicación CODESYS ↔ Python vía Modbus TCP (con HMI) — funcionando end-to-end
 
-**Estado: funcionando end-to-end, v1 completa (6 variables), verificado
-en CODESYS real.** v0 verificada y evidenciada el 9-10 sept 2026 (1
+**Estado: funcionando end-to-end, v2 completa (9 variables incluyendo
+el modelo real de secado y detección de pérdida de comunicación en
+ambos sentidos), verificado en CODESYS real.**
+
+**24 sept 2026 — watchdog CODESYS-side (heartbeat) implementado y
+verificado end-to-end.** El watchdog de la sección 2.2 solo cubría un
+sentido (qué hace Python si CODESYS deja de escribir). Faltaba el
+sentido contrario: cómo se entera CODESYS de que el servidor Python se
+cayó. Se agregó el registro `heartbeat` (dirección 12) y la lógica ST
+correspondiente — ver sección 2.3 (nueva) y los puntos 7-8 de la
+sección 0. **Verificado con CODESYS real:** al detener
+`modbus_server.py`, la alarma de comunicación se enciende y
+`heater_cmd`/`fan_cmd` se fuerzan a 0 de verdad (no solo la alarma
+visual) — evidencia en `evidencia_watchdog_comm_on.png` /
+`evidencia_watchdog_comm_off.png`. Con esto queda cerrado del todo el
+ítem "pérdida de comunicación con comportamiento definido" del
+checklist de la guía (sección 4).
+
+v0 verificada y evidenciada el 9-10 sept 2026 (1
 variable + 1 comando, proyecto `ModbusPhytoon.project`, CODESYS SP15).
 v1 (14-15 sept 2026) amplía el lado Python con una interfaz de planta
 modular (`Plant`/`ToyPlant` en `modbus_server.py`, ver su docstring)
@@ -140,6 +157,59 @@ estos tres puntos fueron el 90% del tiempo perdido la primera vez:
    canal de `T_process` era de longitud 2 y sí funcionó en SP15), así
    que esto parece ser específico de esta instalación/versión de SP9.
 
+7. **En la lógica ST de detección de pérdida de comunicación
+   (heartbeat), el orden de las líneas importa.** La primera versión
+   quedaba así:
+
+   ```st
+   heartbeat_anterior := heartbeat_actual;   // ANTES de comparar -- mal
+
+   IF heartbeat_actual <> heartbeat_anterior THEN
+       tmr_comm(IN := FALSE);
+   ELSE
+       tmr_comm(IN := TRUE, PT := T#4S);
+   END_IF
+   ```
+
+   Con la asignación antes del `IF`, cada ciclo comparas el valor
+   contra sí mismo — siempre parecen iguales, el timer nunca se
+   resetea, y `comm_error` se queda en TRUE para siempre a los pocos
+   segundos de arrancar, aunque el servidor Python siga vivo y
+   `heartbeat` siga subiendo normalmente en el Watch (falso positivo).
+   **Solución:** comparar primero, actualizar `heartbeat_anterior`
+   después:
+
+   ```st
+   IF heartbeat_actual <> heartbeat_anterior THEN
+       tmr_comm(IN := FALSE);
+   ELSE
+       tmr_comm(IN := TRUE, PT := T#4S);
+   END_IF
+   heartbeat_anterior := heartbeat_actual;   // DESPUÉS de comparar
+   comm_error := tmr_comm.Q;
+   ```
+
+   Diagnóstico rápido si esto vuelve a pasar: mira `heartbeat_actual`
+   en el Watch mientras el servidor sigue corriendo — si sube normal
+   pero `comm_error` igual queda en TRUE, es este bug de orden, no un
+   problema de comunicación real.
+
+8. **Detectar la pérdida de comunicación no sirve de nada si el
+   comando no se fuerza de verdad, o si algo más lo vuelve a
+   sobreescribir en el mismo ciclo.** La primera versión encendía la
+   alarma (`comm_error := TRUE`) correctamente, pero la lámpara del
+   HMI mostraba el heater seguir encendido — porque la lógica bang-bang
+   normal (que decide `heater_cmd` según `T_process` vs. `setpoint`)
+   se seguía ejecutando y volvía a poner `heater_cmd := 1`, ya que
+   `T_process` queda congelado por debajo del setpoint cuando se
+   pierde la comunicación (el canal Modbus conserva el último valor
+   leído). **Solución:** en vez de un bloque de override aparte (que
+   depende del orden respecto a otros bloques), se integró `comm_error`
+   directo en la condición de RUN del bang-bang — ver sección 2.3 para
+   el código completo. Verificado con captura: con esta versión, el
+   piloto del heater sí se apaga al mismo tiempo que se enciende la
+   alarma.
+
 ## 1. Arquitectura y roles
 
 | Rol | Papel Modbus | Por qué |
@@ -201,12 +271,86 @@ con CODESYS y:
 2. Publica `safety_ok = 0`.
 
 **Pendiente del lado CODESYS:** esto cubre la mitad Python del
-requisito. Falta, en el proyecto CODESYS, (a) mapear `safety_ok` a una
-variable BOOL y mostrar una alarma/piloto de "comunicación perdida" en
-el HMI cuando valga 0, y (b) configurar el timeout propio del canal
-Modbus master (para que el master también se marque en error si Python
-deja de responder del todo, no solo si dejó de recibir escrituras). Ver
-sección 6.
+requisito — el sentido CODESYS→Python. El sentido contrario
+(Python→CODESYS) se resuelve con `heartbeat`, ver sección 2.3.
+Sigue pendiente configurar el timeout propio del canal Modbus master
+(ver sección 6).
+
+### 2.3 `heartbeat` y `comm_error` — detección CODESYS-side (24 sept 2026)
+
+`safety_ok` (2.2) responde la pregunta "¿CODESYS sigue mandando
+comandos?". Falta la pregunta contraria: "¿el servidor Python sigue
+vivo?" — si el proceso se cae o se cierra, `safety_ok` deja de
+actualizarse igual que todo lo demás, así que no sirve para detectar
+esto.
+
+**Registro 12 — `heartbeat`** (WORD, 0-65535): contador que
+`modbus_server.py` incrementa en CADA ciclo de `bucle_planta`,
+publicado siempre (incluso con `comm_lost=True` del otro sentido). Ver
+docstring de `modbus_server.py`, sección "Señal de latido".
+
+**Canal CODESYS:** igual que los demás, se crea sobre el dispositivo
+esclavo (no sobre el Master — el Master en sí no tiene canales, ver
+nota más abajo si esto confunde):
+
+| Canal | Access type | Dirección | Longitud | Tipo | Variable PLC |
+|---|---|---|---|---|---|
+| `heartbeat` | Read Holding Registers (FC03) | 12 (`16#000C`) | 1 | WORD | `heartbeat_actual` |
+
+No necesita el `UNION` de conversión a REAL (no es un float, es un
+WORD directo).
+
+**Código ST completo** (detección + integración con el control
+bang-bang, ya con la corrección de los puntos 7 y 8 de la sección 0):
+
+```st
+VAR
+    heartbeat_actual   : WORD;   // viene del IO Mapping
+    heartbeat_anterior : WORD;
+    tmr_comm           : TON;
+    comm_error         : BOOL;
+END_VAR
+
+// Comparar PRIMERO, actualizar DESPUÉS (punto 7, sección 0)
+IF heartbeat_actual <> heartbeat_anterior THEN
+    tmr_comm(IN := FALSE);
+ELSE
+    tmr_comm(IN := TRUE, PT := T#4S);
+END_IF
+heartbeat_anterior := heartbeat_actual;
+comm_error := tmr_comm.Q;
+
+// Integrado directo en la condición de RUN, no como override aparte
+// (punto 8, sección 0) -- así no depende del orden con otros bloques:
+IF plant_mode = 0 AND NOT comm_error THEN // RUN, sin pérdida de comunicación
+    IF T_process < setpoint THEN
+        heater_cmd := 1;
+    ELSE
+        heater_cmd := 0;
+    END_IF;
+ELSE // HOLD o comm_error -> valor seguro
+    heater_cmd := 0;
+END_IF;
+// mismo patrón para fan_cmd, con su propia condición de RUN
+```
+
+En el HMI, `comm_error` se conectó a la pareja de lámparas "Estado de
+Comunicación" (verde=OK / roja=error). `T#4S` da margen de 3-4 ciclos
+con `--periodo 1`; si se usa otro periodo, ajustar `PT` a unas 3-5
+veces ese valor.
+
+**Verificado con CODESYS real (24 sept 2026):** con el servidor
+corriendo, `comm_error` se mantiene en FALSE de forma estable. Al
+detener `modbus_server.py` con Ctrl+C, a los ~4 s `comm_error` pasa a
+TRUE, la alarma se enciende, y `heater_cmd`/`fan_cmd` se fuerzan a 0
+(confirmado visualmente: el piloto del heater se apaga junto con la
+alarma). El Trend se congela en el instante exacto de la
+desconexión (consistente con "Conservar el último valor" en el
+tratamiento de errores de los canales). Al reiniciar el servidor,
+`comm_error` vuelve solo a FALSE cuando `heartbeat_actual` retoma el
+conteo. Evidencia: `evidencia_watchdog_comm_on.png` (operación normal)
+y `evidencia_watchdog_comm_off.png` (comunicación perdida, alarma
+activa, heater apagado).
 
 ## 3. Paso a paso en CODESYS (v0, ya hecho — base para v1)
 
@@ -324,6 +468,11 @@ partido en dos canales de 1 registro):
 | `RH_ambient_lo` | Read Holding Registers (FC03) | 5 | 1 | WORD | `RH_ambient_raw[1]` |
 | `plant_mode` | Write Single Register (FC06) | 6 | 1 | WORD | `plant_mode` |
 | `safety_ok` | Read Holding Registers (FC03) | 7 | 1 | WORD | `safety_ok` |
+| `M_coffee_hi` | Read Holding Registers (FC03) | 8 | 1 | WORD | `M_coffee_raw[0]` |
+| `M_coffee_lo` | Read Holding Registers (FC03) | 9 | 1 | WORD | `M_coffee_raw[1]` |
+| `tiempo_proceso_hi` | Read Holding Registers (FC03) | 10 | 1 | WORD | `tiempo_proceso_raw[0]` |
+| `tiempo_proceso_lo` | Read Holding Registers (FC03) | 11 | 1 | WORD | `tiempo_proceso_raw[1]` |
+| `heartbeat` | Read Holding Registers (FC03) | 12 | 1 | WORD | `heartbeat_actual` |
 
 Los dos canales `_hi`/`_lo` de cada REAL se combinan en `PLC_PRG` con
 el mismo `UNION` `U_WORDS_TO_REAL` del paso 6, sin cambios respecto al
@@ -366,15 +515,17 @@ Copiado de la guía vigente:
       la sección 0 con los errores más comunes — ahora con el bug del
       driver SP9 del punto 6, encontrado y resuelto reproduciendo el
       proyecto desde cero el 15 sept 2026).
-- [x]/[ ] Pérdida de comunicación con comportamiento definido —
-      **resuelto del lado Python (14 sept 2026).** `modbus_server.py`
-      implementa un watchdog: si no recibe escrituras de
-      `heater_cmd`/`fan_cmd`/`plant_mode` por más de 5 s, fuerza los
-      actuadores a valor seguro (0) y publica `safety_ok = 0`. Probado
-      localmente con un cliente Modbus de prueba (ver sección 4.1).
-      **Pendiente en CODESYS:** mapear `safety_ok` a una alarma visible
-      en el HMI (el canal ya existe y se lee bien, ver sección 3.1) y
-      configurar el timeout propio del canal master — ver sección 2.2.
+- [x] Pérdida de comunicación con comportamiento definido — **resuelto
+      en ambos sentidos.** Lado Python (14 sept 2026): watchdog en
+      `modbus_server.py`, fuerza actuadores a 0 y publica
+      `safety_ok = 0` si no recibe escrituras de CODESYS por 5 s. Lado
+      CODESYS (24 sept 2026): `heartbeat`/`comm_error` detecta si el
+      servidor Python se cayó, enciende la alarma en el HMI y fuerza
+      `heater_cmd`/`fan_cmd` a 0 de verdad (no solo la alarma) — ver
+      sección 2.3. Verificado con CODESYS real, evidencia en
+      `evidencia_watchdog_comm_on.png`/`_off.png`. **Pendiente, no
+      bloqueante:** configurar el timeout propio del canal Modbus
+      master (sección 6).
 - [x] Evidencia en el repositorio para v1/SP9. `codesys/evidencia_hmi_modbus_v1_sp9.png`
       (15 sept 2026) — HMI completo del proyecto SP9 en vivo:
       `T_process=49.7°C`, `RH_ambient=59.8%`, `Setpoint=50.0°C`,
@@ -406,6 +557,16 @@ correctamente a `T_process`. **Pendiente:** repetir específicamente la
 prueba del watchdog (detener `modbus_server.py` y confirmar que
 `safety_ok` se refleja en CODESYS) con este proyecto nuevo — antes solo
 se probó con un cliente de prueba, no con CODESYS real.
+
+**24 sept 2026 — watchdog CODESYS-side, con CODESYS real:** ver sección
+2.3 para el detalle completo. Resumen: `comm_error` estable en FALSE
+en operación normal; al detener `modbus_server.py`, `comm_error` pasa
+a TRUE en ~4 s, la alarma se enciende y `heater_cmd`/`fan_cmd` se
+fuerzan a 0 (confirmado que el piloto del heater se apaga, no solo la
+alarma); al reiniciar el servidor, se recupera solo. Se encontraron y
+corrigieron dos bugs en el camino (orden de comparación del heartbeat,
+y orden de la lógica de override) — documentados en los puntos 7-8 de
+la sección 0 para no repetirlos.
 
 ## 5. HMI en CODESYS
 

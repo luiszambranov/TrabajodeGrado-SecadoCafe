@@ -63,12 +63,41 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
     7           safety_ok     WORD (0 o 1)      -        Python -> CODESYS (1=comunicación sana,
                                                            0=watchdog activado / valor seguro aplicado)
 
-    Direcciones 8-9 quedan reservadas para M_coffee (contenido de
-    humedad del café), que todavía NO está implementado: requiere el
-    modelo real de secado (``modelo_secado.py``) o el sensor físico
-    (sección 6 de la guía vigente), ninguno de los dos conectado aún a
-    este servidor. Direcciones 10-19 quedan libres para futuras
-    variables.
+    8-9         M_coffee      REAL (float32)    % b.h.   Python -> CODESYS (v2, ver planta_secado.py)
+    10-11       tiempo_proceso_h REAL (float32) h         Python -> CODESYS (v2, horas de MODELO)
+    12          heartbeat     WORD (0-65535)    -        Python -> CODESYS (contador que se
+                                                           incrementa cada ciclo del servidor;
+                                                           ver "Señal de latido" más abajo)
+
+    Direcciones 13-19 quedan libres para futuras variables.
+
+Señal de latido (heartbeat) y detección de caída del servidor
+----------------------------------------------------------------
+El watchdog descrito arriba cubre un solo sentido: qué hace la planta
+Python si CODESYS deja de escribir. Falta el sentido contrario: cómo
+se entera CODESYS de que el servidor Python (la planta) se cayó o se
+quedó colgado, para poder mostrar una alarma y pasar a un estado
+seguro del lado del PLC en vez de seguir mostrando en el HMI el
+último valor leído como si nada hubiera pasado.
+
+``heartbeat`` (registro 12) es un contador de 16 bits que el servidor
+incrementa (con acarreo a 0) en CADA ciclo de ``bucle_planta``,
+publicado siempre, incluso si hay ``comm_lost`` del otro sentido — es
+una señal de "el proceso Python sigue vivo y su bucle sigue
+corriendo", independiente del watchdog de actuadores.
+
+Del lado CODESYS, la detección es simple y no depende de ninguna
+función de diagnóstico específica del driver Modbus (que en SP9 ya
+dio un bug real, ver comunicacion_modbus.md sección 0.6): basta con
+leer ``heartbeat`` cada ciclo de tarea y compararlo con el valor del
+ciclo anterior. Si el valor lleva más de un umbral de tiempo (p. ej.
+3-5 s) sin cambiar, es porque el servidor Python dejó de escribir —
+ya sea porque el proceso se cerró, o porque el canal Modbus master
+perdió la conexión TCP — y ese es el momento de declarar
+``comm_error`` y forzar un estado seguro en el PLC (más allá de lo
+que el registro ``safety_ok`` diga, porque si el servidor está
+caído, ``safety_ok`` tampoco se está actualizando). Ver
+comunicacion_modbus.md para el código ST exacto de esta lógica.
 
 Modo de planta (plant_mode) y valor seguro (safety_ok)
 --------------------------------------------------------
@@ -154,7 +183,10 @@ REG_PLANT_MODE = 6    # 1 registro: 0=RUN, 1=HOLD
 REG_SAFETY_OK = 7     # 1 registro: 0/1 (publicado por Python)
 REG_M_COFFEE = 8       # 2 registros: float32 (v2 -- ver planta_secado.ModeloSecadoPlant)
 REG_TIEMPO_PROCESO = 10  # 2 registros: float32, horas de MODELO transcurridas (v2)
+REG_HEARTBEAT = 12     # 1 registro: contador 0-65535, incrementa cada ciclo del servidor (v2)
 NUM_HOLDING_REGS = 20  # margen para variables futuras
+
+HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
 
 # Direcciones que, al ser escritas por el cliente Modbus (CODESYS), cuentan
 # como "señal de vida" para el watchdog de comunicación.
@@ -344,6 +376,7 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     # ToyPlant queda sin usar (nunca se sobreescribe, ver bucle_planta).
     slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_HEARTBEAT, [0])
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -358,6 +391,7 @@ def bucle_planta(
     (a través de la interfaz ``Plant``, ver más arriba) y publica el
     resultado — cada ``periodo_s`` segundos."""
 
+    heartbeat = 0
     while not stop_event.is_set():
         heater_cmd_bruto = slave_ctx.getValues(3, REG_HEATER_CMD, count=1)[0]
         fan_cmd_bruto = slave_ctx.getValues(3, REG_FAN_CMD, count=1)[0]
@@ -380,12 +414,19 @@ def bucle_planta(
         if outputs.tiempo_proceso_h is not None:
             slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(outputs.tiempo_proceso_h))
 
+        # Heartbeat: se incrementa y publica SIEMPRE, incluso con
+        # comm_lost=True -- es la señal de "el proceso Python sigue
+        # vivo", independiente del watchdog de actuadores (ver
+        # docstring del módulo, "Señal de latido").
+        heartbeat = (heartbeat + 1) % (HEARTBEAT_MAX + 1)
+        slave_ctx.setValues(3, REG_HEARTBEAT, [heartbeat])
+
         estado = "COMM_LOST(valor seguro)" if comm_lost else "OK"
         m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
         tiempo_str = f"{outputs.tiempo_proceso_h:6.2f}h" if outputs.tiempo_proceso_h is not None else "    n/a"
         log.info(
             "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | M_coffee=%s | heater_cmd=%s | "
-            "fan_cmd=%s | plant_mode=%s | safety=%s",
+            "fan_cmd=%s | plant_mode=%s | safety=%s | heartbeat=%s",
             tiempo_str,
             outputs.t_process_c,
             outputs.rh_ambient_pct,
@@ -394,6 +435,7 @@ def bucle_planta(
             fan_cmd_bruto,
             plant_mode,
             estado,
+            heartbeat,
         )
         stop_event.wait(periodo_s)
 
@@ -456,9 +498,10 @@ def main() -> None:
     log.info(
         "Mapa: hr[0-1]=T_process | hr[2]=heater_cmd | hr[3]=fan_cmd | "
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
-        "hr[10-11]=tiempo_proceso_h (v2)"
+        "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2)"
     )
-    log.info("Watchdog de comunicación: %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
+    log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
+    log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")
     log.info("Presiona Ctrl+C para detener.")
 
     try:
