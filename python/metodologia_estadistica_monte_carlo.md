@@ -1,6 +1,7 @@
 # Metodología estadística — comparación de perfiles térmicos (campaña Monte Carlo)
 
-**Estado: diseño definido, no ejecutado (24-25 sept 2026).** Esqueleto de la
+**Estado: diseño definido, no ejecutado (24-25 sept 2026). Métrica primaria,
+comparación primaria y Δ fijados el 29 sept 2026 (sección 6).** Esqueleto de la
 planta dinámica ya existe (`dinamica_termica.py` + `cinetica_dinamica.py` +
 `planta_secado.py`), pero **falta calibrar `ParametrosCamara` y
 `CondicionesSecado`** antes de que un piloto real tenga sentido — ver
@@ -149,6 +150,95 @@ la métrica por estrategia, media y desviación estándar (o intervalo de
 confianza) de las diferencias pareadas, el tamaño de efecto d_z observado, el
 estadístico de la prueba usada y su valor p, y el intervalo de confianza de la
 diferencia — no solo el valor p aislado.
+
+## 6. Métricas, comparaciones y Δ fijados antes del piloto (29 sept 2026)
+
+Este bloque cumple el control de calidad del asesor "métrica primaria y
+comparación primaria fijadas antes de calcular potencia" (informe de
+prioridades, 25 sept 2026, sección 5). Se fija **antes** de correr el piloto y
+no se cambia después de ver datos.
+
+### 6.1 Métrica primaria
+
+**Tiempo de secado hasta la humedad objetivo, `t_obj` [h]**: horas de proceso
+desde M0 = 55 % b.h. hasta 11 % b.h. (centro del rango 10–12 % b.h. de
+almacenamiento seguro; Parra-Coronado et al., 2008), calculado por
+`cinetica_roa.simular` (interpolación lineal dentro del paso). En la propuesta supervisada (lecho de 20 cm por capas),
+`t_obj` es el instante en que el **promedio** del lote llega a 11 % b.h. **y la
+capa más húmeda** queda en ≤ 12 % b.h. (límite superior del rango seguro), para
+que ninguna parte del lote quede húmeda (precisión del 29 sept 2026, antes de
+cualquier corrida del piloto). En las estrategias solares (capa delgada de
+2 cm, uniforme) ambas condiciones coinciden. Si una
+realización no alcanza el objetivo dentro del horizonte máximo (400 h), se
+registra como censurada en 400 h y se reporta aparte.
+
+Por qué esta y no otra:
+- Es la variable que Cenicafé usa para evaluar secadores (horas o días de
+  secado; González et al., 2010; Parra-Coronado et al., 2008) y la que
+  responde directamente a la pregunta técnica del informe del asesor
+  ("¿cómo cambia el desempeño del secado entre las estrategias?").
+- Todas las estrategias la tienen definida con el mismo modelo cinético.
+- La energía no sirve como métrica primaria porque la comparación sería
+  trivial (las estrategias solares no compran energía térmica): se reporta
+  como secundaria y alimenta el objetivo 4 (viabilidad económica).
+
+Nota: en las estrategias solares `t_obj` avanza a saltos de ~1 día (el
+secado solo progresa de día). Esto produce diferencias pareadas con colas
+pesadas y posibles empates; por eso la prueba por defecto es Wilcoxon de
+rangos con signo (sección 4), que tolera ambos, y la t pareada solo si
+Shapiro-Wilk sobre las diferencias no rechaza normalidad.
+
+### 6.2 Comparación primaria y secundarias
+
+- **Primaria (una sola, para el cálculo de N):** propuesta supervisada vs.
+  **línea base solar activa** — la alternativa más fuerte; si la supervisada
+  no se distingue de ella, compararla contra patio no aporta.
+- **Secundarias:** supervisada vs. patio; solar activa vs. patio. Se
+  reportan con corrección de Holm (Holm, 1979) para comparaciones
+  múltiples y no se usan para dimensionar N.
+
+### 6.3 Diferencia mínima de interés Δ
+
+**Δ = 12 h** en `t_obj`. Justificación de ingeniería:
+- 12 h equivale a una jornada diurna de trabajo/sol: una diferencia menor
+  no cambia la programación de lotes en finca (el café se carga y
+  descarga por jornadas).
+- SECAFÉ (Parra-Coronado et al., 2008) señala riesgo alto de hongos y
+  ocratoxina si el café pergamino húmedo espera más de 48 h para secarse;
+  12 h es una fracción operativamente relevante de esa ventana (una
+  cuarta parte).
+- Es un criterio fijado antes del piloto, no derivado de sus datos.
+
+### 6.4 Métricas secundarias (se reportan, no dimensionan N)
+
+| Métrica | Unidad | Para qué |
+|---|---|---|
+| Energía eléctrica comprada (resistencia + ventilador) | kWh por kg de café pergamino seco | Objetivo 4 (costo de operación, OPEX) |
+| Energía térmica específica | kJ por kg de agua evaporada | Eficiencia térmica (comparable con SECAFÉ) |
+| Horas con temperatura del grano > 50 °C | h | Calidad: límite de Cenicafé (González et al., 2010) |
+| Horas de rehumectación (M < Me) | h | Riesgo en estrategias solares |
+| Horas fuera del rango de las fuentes | h | Control de extrapolación (sección 5 del informe del asesor) |
+
+### 6.5 Parámetros fijos de la prueba
+
+α = 0.05 (bilateral), potencia 1−β = 0.80, prueba pareada (Wilcoxon por
+defecto). N se calcula con `statsmodels.stats.power.TTestPower` usando
+d_z = Δ/σ_d con σ_d del piloto, y se aplica la corrección por eficiencia
+relativa asintótica de Wilcoxon (N_W ≈ N_t / 0.955; Lehmann, 1975) si la
+prueba final es Wilcoxon.
+
+### Referencias de esta sección
+
+- González S., C. A., Sanz U., J. R., & Oliveros T., C. E. (2010). Control de
+  caudal y temperatura de aire en el secado mecánico de café. *Cenicafé,
+  61*(4), 281–296. https://biblioteca.cenicafe.org/handle/10778/503
+- Parra-Coronado, A., Roa-Mejía, G., & Oliveros-Tascón, C. E. (2008). SECAFÉ
+  Parte I. *Revista Brasileira de Engenharia Agrícola e Ambiental, 12*(4),
+  415–427.
+- Holm, S. (1979). A simple sequentially rejective multiple test procedure.
+  *Scandinavian Journal of Statistics, 6*(2), 65–70.
+- Lehmann, E. L. (1975). *Nonparametrics: Statistical Methods Based on
+  Ranks*. Holden-Day. (eficiencia relativa de Wilcoxon, 3/π ≈ 0.955)
 
 ## Referencias
 

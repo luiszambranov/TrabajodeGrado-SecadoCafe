@@ -256,6 +256,55 @@ variables futuras.
   el HMI. Revisar que el indicador que hoy dice "HR" en el HMI muestre
   la variable que corresponde (exterior vs. cámara).
 
+**Actualización (29 sept 2026, tarde) — cambios de lógica en `PLC_PRG`
+para coincidir con el secador eléctrico y con la réplica en Python
+(`python/control_supervisado.py`):**
+
+1. **Ventilador encendido durante todo el secado** (`fan_cmd := 1` en el
+   estado de secado). En el secador eléctrico el aire forzado es el que
+   transporta el calor y se lleva la humedad.
+2. **Enclavamiento de flujo:** la resistencia solo puede encenderse con el
+   ventilador encendido. Sin aire, un calentador de ducto se sobrecalienta.
+   La planta Python ya lo aplica, así que si el PLC no lo hace, la
+   resistencia "no calienta" con `fan_cmd = 0`.
+   ```st
+   heater_req := (T_process < setpoint);          // todo/nada, setpoint = 50.0
+   heater_cmd := BOOL_TO_WORD(heater_req AND (fan_cmd = 1) AND NOT comm_error);
+   ```
+3. **Parada automática** cuando `M_coffee <= 11.0` (% b.h.):
+   `heater_cmd := 0; fan_cmd := 0;` (fin del secado; base para la máquina de
+   estados SECANDO → DESCARGA).
+4. `setpoint := 50.0` (González et al., 2010: temperatura máxima del grano
+   sin daño), que ya es el valor actual.
+5. **Inversión del sentido del aire cada 6 h** (SECAFÉ, 2008: práctica de
+   Cenicafé en secadores estáticos). Nuevo registro `flow_dir_cmd`
+   (dirección 15, WORD, CODESYS → Python; 0 = aire de abajo hacia arriba,
+   1 = invertido). Nuevo registro `M_coffee_max` (16-17, REAL, Python →
+   CODESYS): humedad de la capa más húmeda.
+   ```st
+   // tiempo_proceso_h ya llega desde Python (horas de modelo)
+   flow_dir_cmd := BOOL_TO_WORD((TRUNC(tiempo_proceso_h) / 6) MOD 2 = 1);  // TRUNC: REAL -> DINT sin redondear
+   // Parada: promedio <= 11 % Y capa más húmeda <= 12 % b.h.
+   IF (M_coffee <= 11.0) AND (M_coffee_max <= 12.0) THEN
+       fan_cmd := 0; heater_cmd := 0;
+   END_IF;
+   ```
+   Canales nuevos: `flow_dir_cmd` (Write Single Register FC06, dir. 15,
+   `flow_dir_cmd`), `M_coffee_max_hi`/`_lo` (FC03, dir. 16/17,
+   `M_coffee_max_raw[0/1]`, mismo `U_WORDS_TO_REAL`).
+   En FluidSIM, la inversión se representa con una **compuerta (damper)
+   accionada por un cilindro neumático**, no invirtiendo el giro del motor
+   del ventilador (ver `data/reference/secador_electrico_dimensionamiento.md`,
+   sección 3).
+
+**Verificación CODESYS vs. réplica Python** (una vez, para el documento):
+correr el servidor a tiempo real (`--factor-aceleracion 1`) durante ~60 min
+con la misma condición de clima. Comparar la traza de `T_process` y la
+energía de la resistencia con `control_supervisado.simular_supervisada`
+en la misma ventana, y documentar el error. Con factores de aceleración
+altos, el control todo/nada oscila artificialmente (el plenum tiene
+τ ≈ 2 min); sirve para ver la HMI, no para resultados.
+
 **Nota (SP9):** este mapa de *registros* Modbus no cambió, pero del
 lado CODESYS SP9 cada variable REAL de 2 registros se implementa como
 **dos canales de 1 registro cada uno**, no uno de longitud 2 — es el
@@ -493,6 +542,9 @@ partido en dos canales de 1 registro):
 | `heartbeat` | Read Holding Registers (FC03) | 12 | 1 | WORD | `heartbeat_actual` |
 | `RH_process_hi` | Read Holding Registers (FC03) | 13 | 1 | WORD | `RH_process_raw[0]` *(pendiente, 29 sept 2026)* |
 | `RH_process_lo` | Read Holding Registers (FC03) | 14 | 1 | WORD | `RH_process_raw[1]` *(pendiente, 29 sept 2026)* |
+| `flow_dir_cmd` | Write Single Register (FC06) | 15 | 1 | WORD | `flow_dir_cmd` *(pendiente, 29 sept 2026)* |
+| `M_coffee_max_hi` | Read Holding Registers (FC03) | 16 | 1 | WORD | `M_coffee_max_raw[0]` *(pendiente, 29 sept 2026)* |
+| `M_coffee_max_lo` | Read Holding Registers (FC03) | 17 | 1 | WORD | `M_coffee_max_raw[1]` *(pendiente, 29 sept 2026)* |
 
 Los dos canales `_hi`/`_lo` de cada REAL se combinan en `PLC_PRG` con
 el mismo `UNION` `U_WORDS_TO_REAL` del paso 6, sin cambios respecto al

@@ -106,6 +106,20 @@ def mr_sol_abierto(t: np.ndarray) -> np.ndarray:
 # no los parametros cineticos (esos son de Roa, cafe Caturra colombiano).
 # Reproducible con calibrar_dt_max_patio().
 
+# Configuracion fisica (29 sept 2026, lote comun de 80 kg c.p.s.)
+# ----------------------------------------------------------------------
+# Las tres estrategias secan el MISMO lote: 80 kg de cafe pergamino seco
+# (158 kg humedos a 55 % b.h.). En secado solar el cafe se extiende en
+# CAPA DELGADA de ~2 cm (capacidad estandar de los secadores solares de
+# Cenicafe; Guerrero-Aguirre et al., 2025, Avances Tecnicos Cenicafe), de
+# modo que cada grano recibe practicamente el aire/sol del ambiente y la
+# ecuacion de capa delgada de Roa se aplica directamente, sin el modelo
+# por capas que exige el lecho de 20 cm del secador electrico. Area
+# necesaria: 158 kg / 696 kg/m3 (densidad aparente, Montoya 1989) / 0.02 m
+# = ~12.8 m2, frente a 1.28 m2 del secador electrico (dato para CAPEX).
+AREA_CAPA_DELGADA_M2 = 12.8
+ESPESOR_CAPA_DELGADA_M = 0.02
+
 import generador_ambiente as _amb
 import cinetica_roa as _roa
 

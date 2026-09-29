@@ -78,6 +78,19 @@ y solar activa 20 °C (reducción de 36 % frente a patio, dentro de 30–50 %
 de Duque-Dussán et al., 2026, e incremento dentro de 10–25 °C). Ver los
 docstrings de `escenario_sol_abierto.py` y `linea_base_activa.py`.
 
+### Configuración física común (29 sept 2026)
+
+| | Patio | Solar activa | Supervisada (eléctrica) |
+|---|---|---|---|
+| Lote | 80 kg c.p.s. | 80 kg c.p.s. | 80 kg c.p.s. |
+| Disposición del café | Capa delgada ~2 cm, ~12.8 m² | Capa delgada ~2 cm, ~12.8 m² | Lecho de 20 cm, 1.28 m², aire forzado a través del lecho |
+| Modelo | Capa delgada de Roa | Capa delgada de Roa | Lecho de Thompson (8 capas) + Roa, inversión del aire cada 6 h |
+| Fuente de calor | Sol sobre el grano (ΔT 12.9 °C) | Sol en cámara (ΔT 20 °C) | Resistencia de 6 kW, 50 °C |
+
+La capa de 2 cm es la capacidad estándar de los secadores solares de Cenicafé
+(Guerrero-Aguirre et al., 2025). El lecho de 20 cm es el menor espesor evaluado
+por González et al. (2010) para secado mecánico estático.
+
 ## 3. Modelo, no CFD
 
 Los estudios que modelan este tipo de secador con dinámica de fluidos
@@ -95,5 +108,5 @@ consistente con la recomendación de complejidad de la guía operativa.
 5. Solar drying technology for agricultural products: A review. https://arccjournals.com/journal/agricultural-reviews/R-2457
 6. Mathematical modeling of greenhouse solar dryers with natural and forced convection for agricultural products: state of the art. https://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S2007-40262017000100019
 7. Design and optimization of an active and passive mode indirect solar dryer to improve energy efficiency and sustainability. *International Journal of Low-Carbon Technologies.* https://academic.oup.com/ijlct/article/doi/10.1093/ijlct/ctag056/8703217
-
-
+8. Guerrero-Aguirre, A., Sanz-Uribe, J. R., Peñuela-Martínez, A. E., & Osorio-G., C. V. (2025). Manejo del café en el secado solar. *Avances Técnicos Cenicafé*. https://publicaciones.cenicafe.org/index.php/avances_tecnicos/article/view/4247
+9. González S., C. A., Sanz U., J. R., & Oliveros T., C. E. (2010). Control de caudal y temperatura de aire en el secado mecánico de café. *Cenicafé, 61*(4), 281–296. https://biblioteca.cenicafe.org/handle/10778/503

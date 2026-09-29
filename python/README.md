@@ -82,13 +82,28 @@ Modelo de la planta (Python) y procesamiento de resultados.
   (`ModeloSecadoPlant`, ver `planta_secado.py`). Ver
   `codesys/comunicacion_modbus.md` para el lado CODESYS (cliente/master)
   y el procedimiento de prueba completo.
-- `dinamica_termica.py` — balance de energía concentrado (lumped) de la
-  cámara: produce `T_process` a partir de `heater_cmd`/`fan_cmd` y la
-  temperatura ambiente. **Esqueleto v0, no calibrado**: los parámetros
-  de `ParametrosCamara` son de orden de magnitud (elegidos para una
-  temperatura de equilibrio plausible, ~55-60°C), pendientes de
-  calibrar contra la ficha técnica de la secadora física de referencia
-  o con el asesor — ver docstring del módulo.
+- `dinamica_termica.py` — **v1 (29 sept 2026)**: secador eléctrico de la
+  propuesta supervisada. `ParametrosSecador`: lote de 80 kg c.p.s., caudal
+  0.1 m³/min/kg, lecho de 20 cm, resistencia de 6 kW (3 × 2 kW), ventilador
+  de 0.20 kW, setpoint de 50 °C (González et al., 2010, Cenicafé). Plenum
+  con integración exacta y enclavamiento de flujo (resistencia solo con
+  ventilador). Dimensionamiento y fuentes en
+  `data/reference/secador_electrico_dimensionamiento.md`.
+- `lecho_secado.py` — lecho estático por capas de 2.5 cm (modelo de
+  Thompson, como SECAFÉ) con la cinética de Roa en cada capa. Hace el
+  balance de humedad y de calor latente del aire, necesario porque con
+  0.1 m³/min/kg el aire se satura dentro del lecho (sin él, el secado
+  temprano salía ~2× más rápido).
+- `secador_electrico.py` — núcleo físico sin Modbus (plenum + lecho +
+  contadores de energía, agua evaporada, horas con grano > 50 °C,
+  rehumectación y horas fuera de rango). Lo comparten `planta_secado.py`
+  y `control_supervisado.py`.
+- `control_supervisado.py` — réplica en Python de la lógica de `PLC_PRG`
+  (ventilador encendido, todo/nada a 50 °C con ciclo de 1 s, inversión
+  del sentido del aire cada 6 h, parada con promedio ≤ 11 % y capa más
+  húmeda ≤ 12 % b.h.) para la campaña Monte Carlo (reproducible por
+  semilla, sin tiempo real). Día nominal: 33.2 h, 1.79 kWh/kg c.p.s.,
+  capas finales 9.4–11.8 % b.h.
 - `cinetica_roa.py` — **modelo cinético único del proyecto (29 sept
   2026)**: isoterma de equilibrio de Roa para café pergamino (Trejos et
   al., 1989) + ecuación unificada de capa delgada de Roa (SECAFÉ,
@@ -109,14 +124,15 @@ Modelo de la planta (Python) y procesamiento de resultados.
   `k_generalizado` (coeficiente de T mal transcrito y errata del
   artículo en el término T·RH: 1.0318e-4 → 1.0318e-7; ver
   `data/reference/phitakwinai_2019_tabla3_ecuaciones_generalizadas.md`).
-- `planta_secado.py` — `ModeloSecadoPlant(Plant)`: conecta
-  `dinamica_termica.py` + `cinetica_roa.py` detrás de la interfaz
+- `planta_secado.py` — `ModeloSecadoPlant(Plant)`: pone
+  `secador_electrico.py` (plenum + lecho Thompson + Roa) detrás de la interfaz
   `Plant` de `modbus_server.py`. Publica `RH_ambient` (exterior) y
   `RH_process` (cámara) por separado, acepta una secuencia de días de
   clima (`clima_dias`) para recibir la misma realización Monte Carlo que
   las líneas base, y cuenta horas fuera de rango / en rehumectación.
-  Pendiente: calibrar `ParametrosCamara` (resistencia eléctrica) y
-  decidir el factor de aceleración temporal.
+  Con factores de aceleración altos, el control todo/nada desde CODESYS
+  oscila artificialmente (τ del plenum ≈ 2 min): sirve para ver la HMI; los
+  resultados salen de `control_supervisado.py`.
 - `escenario_sol_abierto.py` / `linea_base_activa.py` — desde el 29 sept
   2026 incluyen una versión v0.2 con el modelo de Roa (`simular_patio`,
   `simular_activa`), alimentada con el ambiente de Chinchiná más un
@@ -141,10 +157,13 @@ Modelo de la planta (Python) y procesamiento de resultados.
   `ModbusSlaveContext` en `pymodbus.datastore` y rompen `modbus_server.py`).
 
 Contenido esperado (pendiente):
-- Calibración de `ParametrosCamara` (dinamica_termica.py) con
-  literatura (resistencia eléctrica). **Bloqueante** antes del piloto de
-  la campaña Monte Carlo. (M0/Me ya resueltos el 29 sept 2026 con el
-  modelo de Roa.)
+- Ajustar `PLC_PRG` (ventilador encendido durante el secado, enclavamiento
+  resistencia–ventilador, parada a 11 % b.h.) y verificar CODESYS contra
+  `control_supervisado.py` a tiempo real (ver
+  `codesys/comunicacion_modbus.md`).
+- CODESYS/FluidSIM: canales `flow_dir_cmd` (15) y `M_coffee_max` (16-17),
+  lógica de inversión cada 6 h y compuerta neumática en FluidSIM (ver
+  `codesys/comunicacion_modbus.md`).
 - Prueba repetible (automatizada) de consistencia dinámico vs. estático:
   hoy la verifica el smoke test de `cinetica_roa.py`.
 - Agregar en CODESYS los canales de `RH_process` (registros 13-14), ver
@@ -173,9 +192,10 @@ Esqueleto del modelo real conectado a la interfaz `Plant`
 (`dinamica_termica.py` + `cinetica_dinamica.py` + `planta_secado.py`):
 ✅ — **verificado end-to-end con CODESYS real y HMI el 23 sept 2026**
 (`T_process`, `M_coffee`, `tiempo_proceso_h` en vivo, coincidentes con
-la consola de Python). Sigue pendiente la calibración de
-`ParametrosCamara`/`CondicionesSecado` antes de usar la planta para
-resultados o campañas de la propuesta final.
+la consola de Python). El 29 sept 2026 se reemplazó por el modelo
+definitivo (Roa-Cenicafé + lecho Thompson + secador eléctrico de 80 kg
+c.p.s. dimensionado con fuentes); `ParametrosCamara`/`CondicionesSecado`
+ya no existen como valores de relleno.
 Prueba de integración concurrente Modbus (este servidor) + OPC
 (FluidSIM) + lógica de control, sobre el mismo runtime CODESYS Control
 Win V3: ✅ — corrida en paralelo con `modbus_server.py --plant modelo`

@@ -6,8 +6,17 @@ ModeloSecadoPlant: implementacion de la interfaz modular ``Plant`` (ver
 modbus_server.py) que reemplaza a ToyPlant por el modelo real de secado
 del proyecto, cerrando el lazo:
 
-    heater_cmd/fan_cmd -> dinamica_termica (T_process, RH_process)
-                        -> cinetica_roa (M_coffee, modelo unico Roa-Cenicafe)
+    heater_cmd/fan_cmd -> secador_electrico.SecadorElectrico
+                          (plenum con resistencia de 6 kW, dinamica_termica.py
+                           + lecho de 20 cm por capas, lecho_secado.py:
+                           Thompson + Roa-Cenicafe) -> T_process, RH_process,
+                           M_coffee
+
+ACTUALIZACION 29 sept 2026 (tarde): lote de 80 kg c.p.s., resistencia
+electrica de 6 kW con enclavamiento de flujo (heater AND fan), caudal
+0.1 m3/min/kg y lecho de 20 cm (Gonzalez et al., 2010). La fisica vive en
+secador_electrico.py, compartida con la replica de control en Python
+(control_supervisado.py) que usa la campana Monte Carlo.
 
 ACTUALIZACION 29 sept 2026:
     - La cinetica pasa de cinetica_dinamica.py (Phitakwinai et al. 2019,
@@ -38,8 +47,9 @@ Antes de conectar esto a CODESYS falta, como minimo (Etapa 5 del plan):
     2. [HECHO 29 sept] M0 = 55 % b.h. (cinetica_roa.M0_BH_PCT) y Me
        calculada por isoterma; humedad objetivo 11 % b.h. como criterio
        de parada (cinetica_roa.HUMEDAD_OBJETIVO_BH_PCT).
-    3. Calibrar ParametrosCamara (dinamica_termica.py) contra literatura
-       (resistencia electrica; la secadora fisica solo como referencia).
+    3. [HECHO 29 sept] Secador dimensionado con fuentes
+       (dinamica_termica.ParametrosSecador; ver
+       data/reference/secador_electrico_dimensionamiento.md).
     4. Decidir el factor de aceleracion temporal real a usar en las
        pruebas con CODESYS (ver mas abajo).
 
@@ -59,11 +69,15 @@ segundos) en horas de modelo:
 Con el valor por defecto (3600.0) y periodo_s=1 s, 1 segundo real de
 reloj equivale a 1 hora de modelo -- una corrida de secado de ~8 h
 (propuesta supervisada) se ve completa en ~8 segundos reales en el HMI.
-Es un valor PRELIMINAR elegido por conveniencia de prueba, no una
-decision final: para la campana de resultados real (Monte Carlo,
-comparacion de estrategias) probablemente se necesite un valor mas bajo
-o correr en tiempo real 1:1, a decidir cuando se defina el diseno
-experimental completo (semana 7).
+Limitacion importante (29 sept 2026): el plenum tiene una constante de
+tiempo de ~2 min. Con factor 3600 cada ciclo del servidor avanza 1 h de
+modelo con heater_cmd fijo, asi que un control todo/nada desde CODESYS
+oscila entre ~21 y ~63 C: sirve para ver el comportamiento cualitativo
+en el HMI, NO para resultados. La campana Monte Carlo usa la replica en
+Python (control_supervisado.py, ciclo de 1 s). La verificacion
+CODESYS vs. replica se hace a tiempo real (--factor-aceleracion 1)
+durante una ventana corta (p. ej. 60 min), comparando T_process y la
+energia de la resistencia.
 """
 
 from __future__ import annotations
@@ -71,20 +85,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
-
 from modbus_server import PLANT_MODE_HOLD, Plant, PlantInputs, PlantOutputs
 import cinetica_roa as roa
-from dinamica_termica import ParametrosCamara, paso_temperatura, rh_proceso
 import generador_ambiente as amb
+from dinamica_termica import ParametrosSecador
+from secador_electrico import SecadorElectrico
 
 
 @dataclass
 class ParametrosModeloSecadoPlant:
-    """Parametros de alto nivel de ModeloSecadoPlant (no confundir con
-    ParametrosCamara, que es solo la parte termica)."""
+    """Parametros de alto nivel de ModeloSecadoPlant."""
 
     factor_aceleracion: float = 3600.0  # ver docstring del modulo
-    params_camara: ParametrosCamara = field(default_factory=ParametrosCamara)
+    secador: ParametrosSecador = field(default_factory=ParametrosSecador)
     m0_bh_pct: float = roa.M0_BH_PCT  # humedad inicial [% b.h.]
     clima_dias: Optional[Sequence[amb.CondicionesClimaticas]] = None
     # None -> [condiciones_nominales()] (repite el dia nominal). Para
@@ -92,81 +105,56 @@ class ParametrosModeloSecadoPlant:
 
 
 class ModeloSecadoPlant(Plant):
-    """Planta real (esqueleto v0): cinetica de secado + dinamica termica
-    de camara, en vez de la planta de juguete de primer orden.
+    """Planta de la propuesta supervisada detras del servidor Modbus.
 
-    Ver el docstring del modulo para el estado ("ESQUELETO") y los
-    pendientes antes de considerarla lista para reemplazar a ToyPlant en
-    produccion/entrega.
+    Toda la fisica esta en secador_electrico.SecadorElectrico; esta clase
+    solo traduce comandos Modbus (heater_cmd, fan_cmd, plant_mode) y
+    publica las salidas.
     """
 
     def __init__(self, params: Optional[ParametrosModeloSecadoPlant] = None) -> None:
         self.params = params or ParametrosModeloSecadoPlant()
-        self._clima_dias = list(self.params.clima_dias or [amb.condiciones_nominales()])
+        self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
 
-        t_amb0, _, _ = amb.ambiente_en(0.0, self._clima_dias)
-        self._t_process = t_amb0  # arranca a temperatura ambiente
-        self._m0_bs = roa.bh_a_bs(self.params.m0_bh_pct)
-        self._m_bs = self._m0_bs
-        self._t_acumulado_h = 0.0
-        # Contadores para la campana (control de calidad del asesor: "no
-        # hay extrapolacion silenciosa"): horas de modelo fuera del rango
-        # de las fuentes y horas en rehumectacion.
-        self.horas_fuera_de_rango = 0.0
-        self.horas_rehumectacion = 0.0
+    @property
+    def contadores(self):
+        """Energia, agua evaporada y horas fuera de rango/rehumectacion."""
+        return self.secador.c
 
     def step(self, dt_s: float, inputs: PlantInputs) -> PlantOutputs:
         dt_h = (dt_s / 3600.0) * self.params.factor_aceleracion
 
-        # HOLD explicito de CODESYS tambien debe forzar heater/fan a 0
-        # aqui -- mismo criterio que ToyPlant (comm_lost ya viene
-        # resuelto en PlantInputs por el watchdog de modbus_server.py).
+        # HOLD explicito de CODESYS tambien fuerza heater/fan a 0 (mismo
+        # criterio que ToyPlant; comm_lost ya viene resuelto por el
+        # watchdog de modbus_server.py).
         heater_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.heater_cmd
         fan_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.fan_cmd
 
-        # Ambiente exterior (dia correspondiente de la secuencia clima_dias)
-        t_ambiente, rh_ambiente, ea_kpa = amb.ambiente_en(self._t_acumulado_h, self._clima_dias)
-
-        self._t_process = paso_temperatura(
-            self._t_process, t_ambiente, heater_cmd, fan_cmd, dt_h, self.params.params_camara
-        )
-        # Aire de la camara = aire exterior calentado (misma ea).
-        rh_process = rh_proceso(self._t_process, ea_kpa)
-
-        r = roa.paso_humedad(self._m_bs, self._t_process, rh_process, dt_h, m0_bs_pct=self._m0_bs)
-        self._m_bs = r.m_bs_pct
-        self.horas_fuera_de_rango += dt_h if r.fuera_de_rango else 0.0
-        self.horas_rehumectacion += dt_h if r.rehumectacion else 0.0
-        self._t_acumulado_h += dt_h
-
+        flujo_invertido = bool(inputs.flow_dir_cmd) and inputs.plant_mode != PLANT_MODE_HOLD
+        e = self.secador.paso(heater_cmd, fan_cmd, dt_h, flujo_invertido=flujo_invertido)
         return PlantOutputs(
-            t_process_c=self._t_process,
-            rh_ambient_pct=rh_ambiente,
-            m_coffee_pct=roa.bs_a_bh(self._m_bs),
-            tiempo_proceso_h=self._t_acumulado_h,
-            rh_process_pct=rh_process,
+            t_process_c=e.t_process_c,
+            rh_ambient_pct=e.rh_ambiente_pct,
+            m_coffee_pct=e.m_coffee_bh_pct,
+            tiempo_proceso_h=e.t_h,
+            rh_process_pct=e.rh_process_pct,
+            m_coffee_max_pct=e.m_capa_max_bh_pct,
         )
 
 
 if __name__ == "__main__":
-    # Smoke test manual: pasos sucesivos con heater encendido todo el
-    # tiempo (sin levantar el servidor Modbus), para ver que T_process y
-    # M_coffee se mueven en la direccion esperada.
+    # Smoke test: 2 h de modelo en pasos de 1 min con todo/nada a 50 C
+    # (equivale a correr el servidor con --factor-aceleracion 60).
     from modbus_server import PLANT_MODE_RUN
 
-    plant = ModeloSecadoPlant()
-    inputs = PlantInputs(heater_cmd=1, fan_cmd=0, plant_mode=PLANT_MODE_RUN, comm_lost=False)
-
-    print("t_acum[h]   T_process[C]   RH_ambient[%]   RH_process[%]   M_coffee[% b.h.]")
-    for i in range(30):
-        outputs = plant.step(dt_s=1.0, inputs=inputs)
-        if i % 3 == 0:
-            print(
-                f"{plant._t_acumulado_h:9.2f}   {outputs.t_process_c:11.2f}   "
-                f"{outputs.rh_ambient_pct:13.1f}   {outputs.rh_process_pct:13.1f}   "
-                f"{outputs.m_coffee_pct:14.2f}"
-            )
-    print(
-        f"Horas fuera de rango de las fuentes: {plant.horas_fuera_de_rango:.1f} h | "
-        f"rehumectacion: {plant.horas_rehumectacion:.1f} h"
-    )
+    plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=60.0))
+    heater = 1
+    print("t[h]   T_process[C]  RH_amb[%]  RH_proc[%]  M_coffee[% b.h.]")
+    for i in range(120):
+        out = plant.step(1.0, PlantInputs(heater_cmd=heater, fan_cmd=1, plant_mode=PLANT_MODE_RUN, comm_lost=False))
+        heater = 1 if out.t_process_c < 50.0 else 0
+        if i % 20 == 0:
+            print(f"{out.tiempo_proceso_h:5.2f}  {out.t_process_c:11.2f}  {out.rh_ambient_pct:8.1f}  "
+                  f"{out.rh_process_pct:9.1f}  {out.m_coffee_pct:12.2f}")
+    c = plant.contadores
+    print(f"Energia resistencia {c.energia_resistencia_kwh:.2f} kWh | agua evaporada {c.agua_evaporada_kg:.2f} kg")
