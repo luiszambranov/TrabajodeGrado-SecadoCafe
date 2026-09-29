@@ -68,8 +68,23 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
     12          heartbeat     WORD (0-65535)    -        Python -> CODESYS (contador que se
                                                            incrementa cada ciclo del servidor;
                                                            ver "Señal de latido" más abajo)
+    13-14       RH_process    REAL (float32)    %        Python -> CODESYS (desde 29 sept 2026,
+                                                           HR del aire DENTRO de la cámara)
 
-    Direcciones 13-19 quedan libres para futuras variables.
+    Direcciones 15-19 quedan libres para futuras variables.
+
+    RH_ambient vs RH_process (separados el 29 sept 2026)
+    ------------------------------------------------------
+    - RH_ambient (4-5): HR del aire EXTERIOR (clima de Chinchiná,
+      generador_ambiente.py). Condición de frontera.
+    - RH_process (13-14): HR del aire DENTRO de la cámara, la que recibe
+      el café y la que entra al modelo cinético (psicrometría: aire
+      exterior calentado a T_process, dinamica_termica.rh_proceso).
+    Hasta el 29 sept, ModeloSecadoPlant publicaba la HR de proceso en el
+    registro RH_ambient (TODO anotado en planta_secado.py); ahora cada
+    tag tiene un solo significado. ToyPlant no publica RH_process.
+    Del lado CODESYS hay que agregar la lectura de 13-14 (ver
+    codesys/comunicacion_modbus.md).
 
 Señal de latido (heartbeat) y detección de caída del servidor
 ----------------------------------------------------------------
@@ -184,6 +199,7 @@ REG_SAFETY_OK = 7     # 1 registro: 0/1 (publicado por Python)
 REG_M_COFFEE = 8       # 2 registros: float32 (v2 -- ver planta_secado.ModeloSecadoPlant)
 REG_TIEMPO_PROCESO = 10  # 2 registros: float32, horas de MODELO transcurridas (v2)
 REG_HEARTBEAT = 12     # 1 registro: contador 0-65535, incrementa cada ciclo del servidor (v2)
+REG_RH_PROCESS = 13    # 2 registros: float32, HR dentro de la cámara (29 sept 2026)
 NUM_HOLDING_REGS = 20  # margen para variables futuras
 
 HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
@@ -271,6 +287,9 @@ class PlantOutputs:
     # planta_secado.py) -- direcciones 10-11. Pensado para mostrar
     # "tiempo de secado" en el HMI en vez de fecha/hora del sistema.
     # Mismo criterio que m_coffee_pct: None -> ToyPlant no lo publica.
+    rh_process_pct: float | None = None
+    # HR del aire DENTRO de la cámara [%] -- direcciones 13-14 (29 sept
+    # 2026). rh_ambient_pct es SOLO la HR exterior. None -> ToyPlant.
 
 
 class Plant(abc.ABC):
@@ -377,6 +396,7 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_HEARTBEAT, [0])
+    slave_ctx.setValues(3, REG_RH_PROCESS, float_to_registers(0.0))
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -413,6 +433,8 @@ def bucle_planta(
             slave_ctx.setValues(3, REG_M_COFFEE, float_to_registers(outputs.m_coffee_pct))
         if outputs.tiempo_proceso_h is not None:
             slave_ctx.setValues(3, REG_TIEMPO_PROCESO, float_to_registers(outputs.tiempo_proceso_h))
+        if outputs.rh_process_pct is not None:
+            slave_ctx.setValues(3, REG_RH_PROCESS, float_to_registers(outputs.rh_process_pct))
 
         # Heartbeat: se incrementa y publica SIEMPRE, incluso con
         # comm_lost=True -- es la señal de "el proceso Python sigue
@@ -424,12 +446,14 @@ def bucle_planta(
         estado = "COMM_LOST(valor seguro)" if comm_lost else "OK"
         m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
         tiempo_str = f"{outputs.tiempo_proceso_h:6.2f}h" if outputs.tiempo_proceso_h is not None else "    n/a"
+        rh_proc_str = f"{outputs.rh_process_pct:5.1f}%" if outputs.rh_process_pct is not None else "  n/a"
         log.info(
-            "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | M_coffee=%s | heater_cmd=%s | "
+            "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | RH_process=%s | M_coffee=%s | heater_cmd=%s | "
             "fan_cmd=%s | plant_mode=%s | safety=%s | heartbeat=%s",
             tiempo_str,
             outputs.t_process_c,
             outputs.rh_ambient_pct,
+            rh_proc_str,
             m_coffee_str,
             heater_cmd_bruto,
             fan_cmd_bruto,
@@ -458,8 +482,8 @@ def main() -> None:
         default="toy",
         help=(
             "Planta a usar: 'toy' = planta de juguete (default, sin cambios de comportamiento). "
-            "'modelo' = ModeloSecadoPlant (planta_secado.py), cinetica real + dinamica termica -- "
-            "ESQUELETO v0, leer planta_secado.py antes de usarla para resultados o con CODESYS real."
+            "'modelo' = ModeloSecadoPlant (planta_secado.py), cinetica Roa-Cenicafe + dinamica termica "
+            "(ParametrosCamara aun sin calibrar, leer planta_secado.py antes de usarla para resultados)."
         ),
     )
     parser.add_argument(
@@ -480,7 +504,7 @@ def main() -> None:
 
         plant: Plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=args.factor_aceleracion))
         log.info(
-            "Usando ModeloSecadoPlant (ESQUELETO v0, no calibrado) con factor_aceleracion=%.1f",
+            "Usando ModeloSecadoPlant (cinetica Roa-Cenicafe; ParametrosCamara sin calibrar) con factor_aceleracion=%.1f",
             args.factor_aceleracion,
         )
     else:
@@ -498,7 +522,7 @@ def main() -> None:
     log.info(
         "Mapa: hr[0-1]=T_process | hr[2]=heater_cmd | hr[3]=fan_cmd | "
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
-        "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2)"
+        "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2) | hr[13-14]=RH_process"
     )
     log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")

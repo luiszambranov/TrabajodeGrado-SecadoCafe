@@ -2,6 +2,13 @@
 cinetica_dinamica.py
 =====================
 
+NOTA (29 sept 2026): este modulo YA NO es la cinetica de la planta. Desde
+esa fecha ModeloSecadoPlant (planta_secado.py) y las dos lineas base usan
+el modelo unico de Roa-Cenicafe (cinetica_roa.py), que cubre todo el
+dominio T-HR del proyecto. Phitakwinai et al. (2019) se conserva como
+VALIDACION independiente en 50-70 C / 10-30 % HR (ver
+data/reference/roa_cenicafe_isoterma_capa_delgada.md, seccion 4).
+
 Extiende el modelo Midilli modificado de modelo_secado.py (validado de
 forma ESTÁTICA para T/RH fijos en ajuste_modelos.py) a una forma que
 puede integrarse paso a paso cuando T y RH cambian en el tiempo - como
@@ -73,10 +80,25 @@ T_EQ_BUSQUEDA_MAX_H = 200.0
 
 def k_generalizado(t_c: float, rh_pct: float) -> float:
     """k(T,RH) del modelo Modified-Midilli generalizado (Tabla 3,
-    Phitakwinai et al., 2019, r^2=0.9955)."""
+    Phitakwinai et al., 2019, r^2=0.9955).
+
+    CORRECCION 29 sept 2026 (dos cambios respecto a la version anterior):
+
+    1. Coeficiente de T: 0.014550 (valor impreso en la Tabla 3). La
+       version anterior tenia 0.014457 por error de transcripcion.
+    2. Termino T*RH: se usa 1.0318e-7, NO el 1.0318e-4 impreso en la
+       Tabla 3. Con 1.0318e-4 la ecuacion no reproduce la Tabla 2 del
+       mismo articulo (k resultaba 1.6-3.7 veces el valor publicado y
+       crecia con RH, fisicamente al reves). Con 1.0318e-7 el error
+       maximo frente a las 9 filas Modified_Midilli de la Tabla 2 es
+       0.005 (1/h^n). Una regresion propia de segundo orden sobre esas 9
+       filas da un coeficiente T*RH ~1.0e-7, lo que confirma que el
+       1.0318e-4 es una errata del articulo. Ver
+       data/reference/phitakwinai_2019_tabla3_ecuaciones_generalizadas.md.
+    """
     T, RH = t_c, rh_pct
     return (
-        -0.41202 + 0.014457 * T - 6.3162e-4 * RH + 1.0318e-4 * T * RH
+        -0.41202 + 0.014550 * T - 6.3162e-4 * RH + 1.0318e-7 * T * RH
         - 8.8133e-5 * T**2 - 2.4318e-5 * RH**2
     )
 
@@ -87,7 +109,7 @@ def n_generalizado(t_c: float, rh_pct: float) -> float:
     T, RH = t_c, rh_pct
     return (
         2.19467 - 0.033121 * T + 0.001747 * RH - 3.56e-4 * T * RH
-        + 3.27e-4 * T**2 + 4.7e-4 * RH**2
+        + 3.27e-4 * T**2 + 4.677e-4 * RH**2
     )
 
 
@@ -97,7 +119,7 @@ def b_generalizado(t_c: float, rh_pct: float) -> float:
     T, RH = t_c, rh_pct
     return (
         -0.01318 + 5.5127e-4 * T - 1.3408e-4 * RH + 1.7094e-7 * T * RH
-        - 4.7207e-6 * T**2 + 3.635e-6 * RH**2
+        - 4.72077e-6 * T**2 + 3.635e-6 * RH**2
     )
 
 

@@ -61,11 +61,22 @@ un rango razonable, no copiará un único número de la literatura.
 
 | | Línea base activa | Propuesta supervisada |
 |---|---|---|
-| Fuente de calor | Solar | Solar (misma base) |
+| Fuente de calor | Solar | Resistencia eléctrica (decisión del 29 sept 2026; ver `python/dinamica_termica.py`) |
 | Movimiento de aire | Ventilador todo/nada por temperatura u horario | Actuación neumática (FluidSIM) coordinada por lógica de control |
 | Control | Ninguno o termostato simple | Máquina de estados, PID, alarmas y enclavamientos (CODESYS) |
 | Supervisión | No | HMI con tendencias, alarmas y estado |
 | Registro de datos | No necesariamente | Sí, integrado (Python) |
+
+### Modelo cinético común (actualización 29 sept 2026)
+
+Las tres estrategias (sol/patio, solar activa y propuesta supervisada) usan
+el **mismo** modelo cinético de Roa–Cenicafé (`python/cinetica_roa.py`;
+fuentes en `data/reference/roa_cenicafe_isoterma_capa_delgada.md`); solo
+cambian las condiciones de aire que recibe el café. El incremento solar de
+cada línea base se calibró contra literatura: patio 12.9 °C (Eliseu, 2008)
+y solar activa 20 °C (reducción de 36 % frente a patio, dentro de 30–50 %
+de Duque-Dussán et al., 2026, e incremento dentro de 10–25 °C). Ver los
+docstrings de `escenario_sol_abierto.py` y `linea_base_activa.py`.
 
 ## 3. Modelo, no CFD
 

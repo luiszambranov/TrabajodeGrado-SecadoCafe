@@ -238,6 +238,24 @@ Direcciones 8-9 quedan reservadas para `M_coffee` (pendiente: requiere
 conectado todavía a este servidor). Direcciones 10-19 libres para
 variables futuras.
 
+**Actualización (29 sept 2026) — `RH_process` separado de `RH_ambient`:**
+
+| Dirección Modbus | Tag | Tipo | Unidad | Sentido |
+|---|---|---|---|---|
+| 13-14 (2 registros) | `RH_process` | REAL / float32 IEEE754 | % | Python → CODESYS (solo lectura) |
+
+- `RH_ambient` (4-5) pasa a ser **solo** la HR del aire exterior
+  (clima de Chinchiná, `generador_ambiente.py`). Hasta el 29 sept,
+  `ModeloSecadoPlant` publicaba ahí la HR de la cámara.
+- `RH_process` (13-14) es la HR del aire **dentro** de la cámara (la
+  que recibe el café y entra al modelo cinético de Roa).
+- **Pendiente del lado CODESYS:** agregar los canales
+  `RH_process_hi` (FC03, dirección 13, longitud 1, `RH_process_raw[0]`)
+  y `RH_process_lo` (FC03, dirección 14, longitud 1, `RH_process_raw[1]`),
+  combinarlos con el mismo `U_WORDS_TO_REAL` y mostrar `RH_process` en
+  el HMI. Revisar que el indicador que hoy dice "HR" en el HMI muestre
+  la variable que corresponde (exterior vs. cámara).
+
 **Nota (SP9):** este mapa de *registros* Modbus no cambió, pero del
 lado CODESYS SP9 cada variable REAL de 2 registros se implementa como
 **dos canales de 1 registro cada uno**, no uno de longitud 2 — es el
@@ -473,6 +491,8 @@ partido en dos canales de 1 registro):
 | `tiempo_proceso_hi` | Read Holding Registers (FC03) | 10 | 1 | WORD | `tiempo_proceso_raw[0]` |
 | `tiempo_proceso_lo` | Read Holding Registers (FC03) | 11 | 1 | WORD | `tiempo_proceso_raw[1]` |
 | `heartbeat` | Read Holding Registers (FC03) | 12 | 1 | WORD | `heartbeat_actual` |
+| `RH_process_hi` | Read Holding Registers (FC03) | 13 | 1 | WORD | `RH_process_raw[0]` *(pendiente, 29 sept 2026)* |
+| `RH_process_lo` | Read Holding Registers (FC03) | 14 | 1 | WORD | `RH_process_raw[1]` *(pendiente, 29 sept 2026)* |
 
 Los dos canales `_hi`/`_lo` de cada REAL se combinan en `PLC_PRG` con
 el mismo `UNION` `U_WORDS_TO_REAL` del paso 6, sin cambios respecto al

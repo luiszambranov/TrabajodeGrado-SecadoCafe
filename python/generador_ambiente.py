@@ -170,6 +170,49 @@ def condiciones_perturbadas(
     return cond
 
 
+def ambiente_en(t_h: float, clima_dias) -> tuple[float, float, float]:
+    """(T_ambiente [°C], HR_ambiente [%], ea [kPa]) en el instante ``t_h``
+    [h de proceso, t=0 a medianoche del día 0], usando una SECUENCIA de
+    días de clima (``clima_dias``: lista de CondicionesClimaticas, p. ej.
+    una realización Monte Carlo de ``condiciones_perturbadas``). Si el
+    proceso dura más días que la secuencia, se repite cíclicamente.
+
+    Pensada para que las TRES estrategias reciban exactamente la misma
+    realización ambiental (diseño pareado, ver
+    metodologia_estadistica_monte_carlo.md).
+    """
+    cond = clima_dias[int(t_h // 24.0) % len(clima_dias)]
+    h = np.asarray([t_h % 24.0])
+    return (
+        float(temperatura(h, cond)[0]),
+        float(humedad_relativa(h, cond)[0]),
+        float(cond.ea_kpa),
+    )
+
+
+HORA_AMANECER = 6.0
+HORA_OCASO = 18.0
+"""Horas de sol aproximadas para Chinchina (~5 N): ~12 h de luz todo el
+año por la cercanía al ecuador. Aproximación de este v0.1."""
+
+
+def incremento_solar(t_horas: np.ndarray, dt_max_c: float) -> np.ndarray:
+    """Incremento de temperatura por radiación solar sobre la ambiente [°C].
+
+    Perfil de medio seno entre ``HORA_AMANECER`` y ``HORA_OCASO`` con
+    máximo ``dt_max_c`` al mediodía y 0 de noche. Se usa para representar,
+    de forma concentrada (lumped), el calentamiento del grano en patio o
+    del aire en la cámara del secador solar activo (ver
+    escenario_sol_abierto.py y linea_base_activa.py). ``dt_max_c`` NO es
+    un dato climático: es un parámetro de cada estrategia, calibrado
+    contra literatura en su módulo correspondiente.
+    """
+    h = np.asarray(t_horas, dtype=float) % 24.0
+    dia = (h >= HORA_AMANECER) & (h <= HORA_OCASO)
+    fase = np.pi * (h - HORA_AMANECER) / (HORA_OCASO - HORA_AMANECER)
+    return np.where(dia, dt_max_c * np.sin(fase), 0.0)
+
+
 def generar_dia(cond: CondicionesClimaticas, paso_h: float = 1.0) -> dict:
     """Genera un día completo (0-24 h) de T y HR ambiente para una condición dada."""
     t_horas = np.arange(0.0, 24.0 + 1e-9, paso_h)

@@ -7,8 +7,21 @@ modbus_server.py) que reemplaza a ToyPlant por el modelo real de secado
 del proyecto, cerrando el lazo:
 
     heater_cmd/fan_cmd -> dinamica_termica (T_process, RH_process)
-                        -> cinetica_dinamica (MR, via Tabla 3 Phitakwinai)
-                        -> M_coffee (modelo_secado: MR -> humedad %)
+                        -> cinetica_roa (M_coffee, modelo unico Roa-Cenicafe)
+
+ACTUALIZACION 29 sept 2026:
+    - La cinetica pasa de cinetica_dinamica.py (Phitakwinai et al. 2019,
+      valido solo 50-70 C / 10-30 % HR) a cinetica_roa.py (isoterma de
+      Trejos et al. 1989 + capa delgada de Roa, SECAFE 2008), el modelo
+      unico de las tres estrategias. Phitakwinai queda como validacion.
+    - M0 = 55 % b.h. y humedad de equilibrio Me(T,HR) calculada por la
+      isoterma (ya no los valores "de relleno" 50 %/12 % de modelo_secado).
+    - Se separan RH_ambient (HR del aire exterior) y RH_process (HR del
+      aire dentro de la camara, la que recibe el cafe); cada una con su
+      registro Modbus (ver modbus_server.py).
+    - El ambiente puede ser una secuencia de dias (``clima_dias``) para
+      que la planta reciba la misma realizacion Monte Carlo que las
+      lineas base.
 
 Trabajo de grado - Sistema de supervision digital para el secado de cafe.
 Etapa 4 del plan de implementacion escalonada (asesoria del 23 sept
@@ -19,14 +32,14 @@ seccion 6 ("Conectar modelo_secado.py real").
 ESTADO: ESQUELETO (v0), no calibrado ni verificado end-to-end todavia.
 Antes de conectar esto a CODESYS falta, como minimo (Etapa 5 del plan):
 
-    1. Verificar que, con T/RH constantes (sin perturbaciones,
-       heater_cmd fijo), esta planta reproduce la MISMA curva que ya
-       valido ajuste_modelos.py (chequeo de consistencia obligatorio).
-    2. Fijar M0/Me reales del caso de estudio en CondicionesSecado (hoy
-       usa los valores preliminares "de relleno" de modelo_secado.py:
-       50%/12% b.h. - ver advertencia en ese modulo).
-    3. Calibrar ParametrosCamara (dinamica_termica.py) contra la ficha
-       tecnica de la secadora fisica de referencia, o con el asesor.
+    1. [HECHO 29 sept] Consistencia dinamico vs estatico a T/RH
+       constantes: cinetica_roa.paso_humedad reproduce la solucion
+       analitica (error ~1e-14, ver smoke test de cinetica_roa.py).
+    2. [HECHO 29 sept] M0 = 55 % b.h. (cinetica_roa.M0_BH_PCT) y Me
+       calculada por isoterma; humedad objetivo 11 % b.h. como criterio
+       de parada (cinetica_roa.HUMEDAD_OBJETIVO_BH_PCT).
+    3. Calibrar ParametrosCamara (dinamica_termica.py) contra literatura
+       (resistencia electrica; la secadora fisica solo como referencia).
     4. Decidir el factor de aceleracion temporal real a usar en las
        pruebas con CODESYS (ver mas abajo).
 
@@ -56,13 +69,11 @@ experimental completo (semana 7).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Sequence
 
-import numpy as np
 
 from modbus_server import PLANT_MODE_HOLD, Plant, PlantInputs, PlantOutputs
-from modelo_secado import CondicionesSecado, mr_a_humedad
-from cinetica_dinamica import paso_mr
+import cinetica_roa as roa
 from dinamica_termica import ParametrosCamara, paso_temperatura, rh_proceso
 import generador_ambiente as amb
 
@@ -74,8 +85,10 @@ class ParametrosModeloSecadoPlant:
 
     factor_aceleracion: float = 3600.0  # ver docstring del modulo
     params_camara: ParametrosCamara = field(default_factory=ParametrosCamara)
-    cond_humedad: CondicionesSecado = field(default_factory=CondicionesSecado)
-    condiciones_ambiente: Optional[amb.CondicionesClimaticas] = None  # None -> condiciones_nominales()
+    m0_bh_pct: float = roa.M0_BH_PCT  # humedad inicial [% b.h.]
+    clima_dias: Optional[Sequence[amb.CondicionesClimaticas]] = None
+    # None -> [condiciones_nominales()] (repite el dia nominal). Para
+    # Monte Carlo: la MISMA lista de dias que reciben las lineas base.
 
 
 class ModeloSecadoPlant(Plant):
@@ -89,15 +102,21 @@ class ModeloSecadoPlant(Plant):
 
     def __init__(self, params: Optional[ParametrosModeloSecadoPlant] = None) -> None:
         self.params = params or ParametrosModeloSecadoPlant()
-        self._condiciones_ambiente = self.params.condiciones_ambiente or amb.condiciones_nominales()
+        self._clima_dias = list(self.params.clima_dias or [amb.condiciones_nominales()])
 
-        self._t_process = self._condiciones_ambiente.t_min  # arranca frio, como ToyPlant.T_AMBIENTE_C
-        self._mr = 1.0  # MR=1 -> M=M0 (humedad inicial), coherente con CondicionesSecado
+        t_amb0, _, _ = amb.ambiente_en(0.0, self._clima_dias)
+        self._t_process = t_amb0  # arranca a temperatura ambiente
+        self._m0_bs = roa.bh_a_bs(self.params.m0_bh_pct)
+        self._m_bs = self._m0_bs
         self._t_acumulado_h = 0.0
+        # Contadores para la campana (control de calidad del asesor: "no
+        # hay extrapolacion silenciosa"): horas de modelo fuera del rango
+        # de las fuentes y horas en rehumectacion.
+        self.horas_fuera_de_rango = 0.0
+        self.horas_rehumectacion = 0.0
 
     def step(self, dt_s: float, inputs: PlantInputs) -> PlantOutputs:
         dt_h = (dt_s / 3600.0) * self.params.factor_aceleracion
-        self._t_acumulado_h += dt_h
 
         # HOLD explicito de CODESYS tambien debe forzar heater/fan a 0
         # aqui -- mismo criterio que ToyPlant (comm_lost ya viene
@@ -105,41 +124,28 @@ class ModeloSecadoPlant(Plant):
         heater_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.heater_cmd
         fan_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.fan_cmd
 
-        # Ambiente: ciclo diurno nominal de generador_ambiente.py,
-        # evaluado en la hora del dia correspondiente al tiempo de
-        # modelo acumulado. TODO: dia a dia con condiciones_perturbadas
-        # (para la campana Monte Carlo) -- por ahora repite el mismo dia
-        # nominal indefinidamente (mod 24h).
-        hora_del_dia = self._t_acumulado_h % 24.0
-        t_ambiente = float(amb.temperatura(np.asarray([hora_del_dia]), self._condiciones_ambiente)[0])
+        # Ambiente exterior (dia correspondiente de la secuencia clima_dias)
+        t_ambiente, rh_ambiente, ea_kpa = amb.ambiente_en(self._t_acumulado_h, self._clima_dias)
 
         self._t_process = paso_temperatura(
             self._t_process, t_ambiente, heater_cmd, fan_cmd, dt_h, self.params.params_camara
         )
-        rh_process = rh_proceso(self._t_process, self._condiciones_ambiente.ea_kpa)
+        # Aire de la camara = aire exterior calentado (misma ea).
+        rh_process = rh_proceso(self._t_process, ea_kpa)
 
-        resultado_mr = paso_mr(self._mr, self._t_process, rh_process, dt_h)
-        self._mr = resultado_mr.mr_nuevo
-
-        m_coffee = float(mr_a_humedad(np.asarray([self._mr]), self.params.cond_humedad)[0])
+        r = roa.paso_humedad(self._m_bs, self._t_process, rh_process, dt_h, m0_bs_pct=self._m0_bs)
+        self._m_bs = r.m_bs_pct
+        self.horas_fuera_de_rango += dt_h if r.fuera_de_rango else 0.0
+        self.horas_rehumectacion += dt_h if r.rehumectacion else 0.0
+        self._t_acumulado_h += dt_h
 
         return PlantOutputs(
             t_process_c=self._t_process,
-            rh_ambient_pct=rh_process,  # NOTA: hoy es RH del PROCESO, no del ambiente exterior -- ver TODO abajo
-            m_coffee_pct=m_coffee,
+            rh_ambient_pct=rh_ambiente,
+            m_coffee_pct=roa.bs_a_bh(self._m_bs),
             tiempo_proceso_h=self._t_acumulado_h,
+            rh_process_pct=rh_process,
         )
-
-
-# TODO (decision pendiente, no solo de codigo): el registro Modbus
-# "RH_ambient" (ver modbus_server.py) se penso originalmente para
-# humedad AMBIENTE exterior (ToyPlant la simula como oscilacion, sin
-# relacion con el clima real). Esta planta publica ahi la humedad
-# relativa DENTRO de la camara (rh_proceso), que es mas util para
-# supervisar el proceso pero cambia el significado del tag. Revisar
-# junto con la tabla de variables operacionalizada (pendiente segun la
-# revision del asesor) si conviene separar RH_ambient (exterior) de un
-# RH_process nuevo, con su propio registro Modbus y su pieza en el HMI.
 
 
 if __name__ == "__main__":
@@ -151,11 +157,16 @@ if __name__ == "__main__":
     plant = ModeloSecadoPlant()
     inputs = PlantInputs(heater_cmd=1, fan_cmd=0, plant_mode=PLANT_MODE_RUN, comm_lost=False)
 
-    print("t_acum[h]   T_process[C]   RH_proceso[%]   M_coffee[% b.h.]")
-    for i in range(20):
+    print("t_acum[h]   T_process[C]   RH_ambient[%]   RH_process[%]   M_coffee[% b.h.]")
+    for i in range(30):
         outputs = plant.step(dt_s=1.0, inputs=inputs)
-        if i % 2 == 0:
+        if i % 3 == 0:
             print(
                 f"{plant._t_acumulado_h:9.2f}   {outputs.t_process_c:11.2f}   "
-                f"{outputs.rh_ambient_pct:13.1f}   {outputs.m_coffee_pct:14.2f}"
+                f"{outputs.rh_ambient_pct:13.1f}   {outputs.rh_process_pct:13.1f}   "
+                f"{outputs.m_coffee_pct:14.2f}"
             )
+    print(
+        f"Horas fuera de rango de las fuentes: {plant.horas_fuera_de_rango:.1f} h | "
+        f"rehumectacion: {plant.horas_rehumectacion:.1f} h"
+    )

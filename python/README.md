@@ -89,24 +89,42 @@ Modelo de la planta (Python) y procesamiento de resultados.
   temperatura de equilibrio plausible, ~55-60°C), pendientes de
   calibrar contra la ficha técnica de la secadora física de referencia
   o con el asesor — ver docstring del módulo.
-- `cinetica_dinamica.py` — extiende Midilli modificado
-  (`modelo_secado.py`) a una forma que se puede integrar paso a paso
-  cuando T/RH cambian en el tiempo, usando las ecuaciones generalizadas
-  k(T,RH), n(T,RH), b(T,RH) de la Tabla 3 de Phitakwinai et al. (2019) y
-  el método de "tiempo equivalente" (justificación completa en el
-  docstring del módulo). Válido dentro de T:50-70°C/RH:10-30%; fuera de
-  ese rango marca `fuera_de_rango=True` en vez de fallar. El smoke test
-  del módulo verifica que, con T/RH fijos, este método reproduce
-  exactamente la curva estática ya validada por `ajuste_modelos.py`.
+- `cinetica_roa.py` — **modelo cinético único del proyecto (29 sept
+  2026)**: isoterma de equilibrio de Roa para café pergamino (Trejos et
+  al., 1989) + ecuación unificada de capa delgada de Roa (SECAFÉ,
+  Parra-Coronado et al., 2008). Cubre T 10–70 °C y HR 5–100 % (isoterma
+  medida a 5–55 °C), es decir todo el dominio de las tres estrategias.
+  La HR entra por la humedad de equilibrio Me(T,HR) y por el déficit de
+  presión de vapor del aire. Paso dinámico por tiempo equivalente
+  (reproduce la solución analítica a T/HR constantes, error ~1e-14),
+  rehumectación cuando M < Me, contadores de horas fuera de rango y
+  función `simular()` para las líneas base. M0 = 55 % b.h.; humedad
+  objetivo 11 % b.h. como criterio de parada (separada de Me). Fuentes,
+  erratas detectadas y verificación cruzada contra Phitakwinai y Eliseu
+  en `data/reference/roa_cenicafe_isoterma_capa_delgada.md`.
+- `cinetica_dinamica.py` — Midilli modificado generalizado de
+  Phitakwinai et al. (2019, Tabla 3), válido solo en T 50–70 °C / RH
+  10–30 %. **Desde el 29 sept 2026 ya no es la cinética de la planta**;
+  se conserva como validación independiente. Ese día se corrigió
+  `k_generalizado` (coeficiente de T mal transcrito y errata del
+  artículo en el término T·RH: 1.0318e-4 → 1.0318e-7; ver
+  `data/reference/phitakwinai_2019_tabla3_ecuaciones_generalizadas.md`).
 - `planta_secado.py` — `ModeloSecadoPlant(Plant)`: conecta
-  `dinamica_termica.py` + `cinetica_dinamica.py` + `modelo_secado.py`
-  (conversión MR → `M_coffee`) detrás de la interfaz `Plant` de
-  `modbus_server.py`, reemplazando la planta de juguete. **Esqueleto
-  v0**: antes de usarla para resultados o con CODESYS real falta (ver
-  docstring del módulo) verificar consistencia contra el modelo
-  estático, fijar M0/Me reales del caso de estudio, calibrar
-  `ParametrosCamara`, y decidir el factor de aceleración temporal para
-  las pruebas (hoy 1 s de reloj real = 1 h de modelo, por defecto).
+  `dinamica_termica.py` + `cinetica_roa.py` detrás de la interfaz
+  `Plant` de `modbus_server.py`. Publica `RH_ambient` (exterior) y
+  `RH_process` (cámara) por separado, acepta una secuencia de días de
+  clima (`clima_dias`) para recibir la misma realización Monte Carlo que
+  las líneas base, y cuenta horas fuera de rango / en rehumectación.
+  Pendiente: calibrar `ParametrosCamara` (resistencia eléctrica) y
+  decidir el factor de aceleración temporal.
+- `escenario_sol_abierto.py` / `linea_base_activa.py` — desde el 29 sept
+  2026 incluyen una versión v0.2 con el modelo de Roa (`simular_patio`,
+  `simular_activa`), alimentada con el ambiente de Chinchiná más un
+  incremento solar diurno calibrado contra literatura (patio 12.9 °C vs.
+  Eliseu 2008; solar activa 20 °C, reducción 36 % frente a patio dentro de
+  30–50 % de Duque-Dussán et al., 2026). Las versiones v0.1 (Newton,
+  Logarítmico) se conservan para los notebooks de la semana 5, pero no
+  responden a T/HR y no deben usarse en Monte Carlo.
 - `metodologia_estadistica_monte_carlo.md` — **diseño definido, no
   ejecutado (24-25 sept 2026)**: protocolo estadístico para la campaña
   Monte Carlo de comparación de perfiles térmicos. Fija el diseño como
@@ -123,14 +141,14 @@ Modelo de la planta (Python) y procesamiento de resultados.
   `ModbusSlaveContext` en `pymodbus.datastore` y rompen `modbus_server.py`).
 
 Contenido esperado (pendiente):
-- Calibración de `ParametrosCamara` (dinamica_termica.py) y de
-  `CondicionesSecado` (M0/Me reales) contra la ficha técnica de la
-  secadora física o con el asesor. **Bloqueante** antes del piloto de la
-  campaña Monte Carlo (ver `metodologia_estadistica_monte_carlo.md`).
-- Verificación rigurosa de consistencia planta dinámica vs. modelo
-  estático (Etapa 5 del plan de implementación) — el smoke test de
-  `cinetica_dinamica.py` ya lo comprueba de forma manual con T/RH
-  fijos, falta automatizarlo como prueba repetible.
+- Calibración de `ParametrosCamara` (dinamica_termica.py) con
+  literatura (resistencia eléctrica). **Bloqueante** antes del piloto de
+  la campaña Monte Carlo. (M0/Me ya resueltos el 29 sept 2026 con el
+  modelo de Roa.)
+- Prueba repetible (automatizada) de consistencia dinámico vs. estático:
+  hoy la verifica el smoke test de `cinetica_roa.py`.
+- Agregar en CODESYS los canales de `RH_process` (registros 13-14), ver
+  `codesys/comunicacion_modbus.md`.
 - Timeout del canal master en CODESYS (pendiente de
   `codesys/comunicacion_modbus.md`, sección 6; no bloqueante, `heartbeat`
   ya cubre el mismo caso).
