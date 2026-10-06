@@ -4,8 +4,10 @@ generador_ambiente.py
 
 Generador de temperatura y humedad relativa ambiente (nominal y
 perturbado), para alimentar los modelos de secado solar (línea base
-pasiva y línea base activa) del proyecto.
-Semana 5 - "Modelo base validado".
+pasiva y línea base activa) y el aire de entrada del secador eléctrico.
+Versión vigente: 4 oct 2026 (ciclo asimétrico + variabilidad día a día
+AR(1) ajustada con NASA POWER 2005-2024, ver variabilidad_clima.py y
+data/reference/chinchina_clima_fuentes.md). Primera versión: semana 5.
 
 Zona climática de referencia
 -----------------------------
@@ -26,15 +28,17 @@ Datos reportados (usados como constantes de este módulo):
     - HR de la tarde en días soleados: ~40 %
     - HR mínima diaria registrada: 53 %
 
-Alcance v0.1 (simplificaciones explícitas)
---------------------------------------------
-1. Ciclo diurno de temperatura: seno SIMÉTRICO, no el modelo asimétrico
-   tipo Parton & Logan (1981) que usan algunos estudios agrometeorológicos
-   (calentamiento diurno rápido, enfriamiento nocturno más lento). En
-   este v0.1 el mínimo de temperatura cae a las 02:00 y el máximo a las
-   14:00, en vez del amanecer real (~05:00-06:00, según Cenicafé). Es una
-   aproximación aceptable para un primer modelo; se puede refinar después
-   si la fidelidad horaria resulta importante para el control.
+Simplificaciones explícitas
+----------------------------
+1. Ciclo diurno de temperatura (ACTUALIZADO 4 oct 2026): curva
+   ASIMÉTRICA de dos semicosenos con el mínimo a las 05:30 y el máximo a
+   las 15:30, que son los centros de las franjas medidas en la sede de
+   Cenicafé en Chinchiná: "La temperatura mínima ocurre entre las 05:00 y
+   las 06:00 y la máxima entre las 15:00 y las 16:00" (Guzmán & Ramírez,
+   2004, Cenicafé 55(2), p. 112). El calentamiento dura 10 h y el
+   enfriamiento 14 h, igual que el patrón descrito por Parton & Logan
+   (1981): sube rápido de día y baja lento de noche. Antes (v0.1) era un
+   seno simétrico con el mínimo a las 02:00 y el máximo a las 14:00.
 2. Humedad relativa: se deriva de un enfoque psicrométrico simple. Se
    asume presión de vapor real (ea) aproximadamente constante durante el
    día (aproximación estándar en meteorología agrícola de corto plazo:
@@ -49,11 +53,23 @@ Alcance v0.1 (simplificaciones explícitas)
    independiente que podría contradecir la curva de T. Se ajusta la ea
    nominal para que la HR quede cerca de saturación quer la temperatura
    está en su mínimo (de noche), replicando lo reportado por Cenicafé.
-3. La variabilidad día a día (sigma_t, sigma_ea_frac en
-   ``condiciones_perturbadas``) es un supuesto razonable, NO un dato
-   reportado explícitamente en la fuente climática (que solo da
-   promedios mensuales). Ajustar si se consigue un dato de variabilidad
-   diaria real (por ejemplo series horarias de una estación).
+3. Variabilidad día a día (ACTUALIZADO 4 oct 2026): calculada de 20 años
+   de datos diarios de NASA POWER (2005-2024, punto 4.97 N, 75.65 O,
+   reanálisis MERRA-2) con python/variabilidad_clima.py y el "método
+   delta": las MEDIAS siguen siendo las de Naranjal y de la serie solo se
+   toman las desviaciones de cada día respecto a la media de su mes.
+       sigma T_min = 0.97 °C, sigma T_max = 1.36 °C (antes 1.5 supuesto)
+       correlación T_min-T_max = -0.07 (~0, se tratan independientes)
+       persistencia (autocorrelación de un día al siguiente):
+           T_min 0.49, T_max 0.39 -> modelo AR(1) en
+           ``secuencia_dias_perturbados``
+       ea: se deriva de T_min (FRACCION_SATURACION_NOCTURNA); el ruido
+           residual de ea/es(T_min) es 4 % con persistencia 0.22.
+   Cita: NASA Langley Research Center POWER Project, https://power.larc.nasa.gov
+   (consultado el 4 oct 2026). Datos en data/clima/.
+   Limitación: un reanálisis suaviza los extremos (los récords de Naranjal
+   quedan a ~5 sigma), así que sigma podría estar algo subestimada; se
+   recomienda un análisis de sensibilidad con sigma = 1.5 °C.
 """
 
 from __future__ import annotations
@@ -70,12 +86,20 @@ import numpy as np
 
 T_MIN_MEDIO = 16.4   # °C
 T_MAX_MEDIO = 26.8   # °C
-HORA_T_MIN = 2.0     # h (0-24), ver simplificación (1) en el docstring
-HORA_T_MAX = 14.0    # h
+HORA_T_MIN = 5.5     # h (0-24): 05:00-06:00 (Guzmán & Ramírez, 2004, Cenicafé 55(2):111-129)
+HORA_T_MAX = 15.5    # h: 15:00-16:00 (misma fuente)
 
 # Fracción de saturación asumida en el momento más frío del día (de
 # noche la HR reportada por Cenicafé es > 95%).
 FRACCION_SATURACION_NOCTURNA = 0.97
+
+# Variabilidad día a día (NASA POWER 2005-2024, ver simplificación 3)
+SIGMA_TMIN_C = 0.97
+SIGMA_TMAX_C = 1.36
+PHI_TMIN = 0.49          # autocorrelación de un día al siguiente
+PHI_TMAX = 0.39
+SIGMA_EA_RESID_FRAC = 0.04
+PHI_EA = 0.22
 
 
 def es_kpa(t_c: np.ndarray) -> np.ndarray:
@@ -114,13 +138,23 @@ class CondicionesClimaticas:
 
 
 def temperatura(t_horas: np.ndarray, cond: CondicionesClimaticas) -> np.ndarray:
-    """Temperatura ambiente [°C] según la hora del día (ciclo seno simétrico, v0.1)."""
-    t_horas = np.asarray(t_horas, dtype=float)
-    t_media = (cond.t_max + cond.t_min) / 2.0
-    amplitud = (cond.t_max - cond.t_min) / 2.0
-    # sin(pi/2) ocurre 6h despues de la fase => fase = hora_t_max - 6
-    fase = cond.hora_t_max - 6.0
-    return t_media + amplitud * np.sin(2 * np.pi * (t_horas - fase) / 24.0)
+    """Temperatura ambiente [°C] según la hora del día.
+
+    Curva asimétrica de dos semicosenos (ver simplificación 1 del
+    docstring): sube de T_min (hora_t_min) a T_max (hora_t_max) y baja de
+    T_max a T_min del día siguiente en las horas restantes.
+    """
+    h = np.asarray(t_horas, dtype=float) % 24.0
+    h_min, h_max = cond.hora_t_min, cond.hora_t_max
+    amp = cond.t_max - cond.t_min
+    dur_sube = (h_max - h_min) % 24.0
+    dur_baja = 24.0 - dur_sube
+    d_sube = (h - h_min) % 24.0
+    subiendo = d_sube <= dur_sube
+    t_sube = cond.t_min + amp * 0.5 * (1.0 - np.cos(np.pi * d_sube / dur_sube))
+    d_baja = (h - h_max) % 24.0
+    t_baja = cond.t_max - amp * 0.5 * (1.0 - np.cos(np.pi * d_baja / dur_baja))
+    return np.where(subiendo, t_sube, t_baja)
 
 
 def humedad_relativa(t_horas: np.ndarray, cond: CondicionesClimaticas) -> np.ndarray:
@@ -137,37 +171,64 @@ def condiciones_nominales() -> CondicionesClimaticas:
 
 def condiciones_perturbadas(
     rng: np.random.Generator,
-    sigma_t: float = 1.5,
-    sigma_ea_frac: float = 0.08,
+    sigma_t: Optional[float] = None,
+    sigma_ea_frac: float = SIGMA_EA_RESID_FRAC,
 ) -> CondicionesClimaticas:
-    """Genera un día de clima perturbado (variabilidad día a día).
+    """Genera UN día de clima perturbado, independiente de los demás.
 
-    Parámetros
-    ----------
-    rng : np.random.Generator
-        Generador de números aleatorios (usar np.random.default_rng(seed)
-        y GUARDAR la semilla para reproducibilidad, ver
-        docs/matriz_comparativa_modelos.md y la guía operativa:
-        "Semillas almacenadas").
-    sigma_t : float
-        Desviación estándar [°C] aplicada a T_min y T_max del día,
-        alrededor de los valores medios de la estación Naranjal.
-        Supuesto razonable (no reportado explícitamente en la fuente
-        climática); ajustar si se consigue un dato de variabilidad
-        diaria real.
-    sigma_ea_frac : float
-        Variabilidad fraccional de la presión de vapor real del día
-        (días más húmedos/nublados vs. más secos/despejados).
+    Para campañas Monte Carlo usar ``secuencia_dias_perturbados``, que
+    respeta la persistencia día a día medida (AR(1)).
+
+    sigma_t : si se da, usa la misma sigma para T_min y T_max (compatibilidad
+        con v0.1 y análisis de sensibilidad); por defecto SIGMA_TMIN_C y
+        SIGMA_TMAX_C (NASA POWER).
+    sigma_ea_frac : ruido fraccional de ea alrededor de
+        FRACCION_SATURACION_NOCTURNA*es(T_min).
     """
-    t_min = float(rng.normal(T_MIN_MEDIO, sigma_t))
-    t_max = float(rng.normal(T_MAX_MEDIO, sigma_t))
+    s_min = SIGMA_TMIN_C if sigma_t is None else sigma_t
+    s_max = SIGMA_TMAX_C if sigma_t is None else sigma_t
+    return _dia_desde_anomalias(float(rng.normal(0.0, s_min)), float(rng.normal(0.0, s_max)),
+                                float(rng.normal(0.0, sigma_ea_frac)))
+
+
+def _dia_desde_anomalias(a_min: float, a_max: float, a_ea: float) -> CondicionesClimaticas:
+    t_min = T_MIN_MEDIO + a_min
+    t_max = T_MAX_MEDIO + a_max
     if t_max <= t_min:
-        # Evita un día atípico con oscilación invertida; conserva un
-        # rango mínimo de 1 C.
+        # Evita un día atípico con oscilación invertida; conserva 1 C de rango.
         t_max = t_min + 1.0
     cond = CondicionesClimaticas(t_min=t_min, t_max=t_max)
-    cond.ea_kpa = cond.ea_kpa * float(rng.normal(1.0, sigma_ea_frac))
+    cond.ea_kpa = cond.ea_kpa * (1.0 + a_ea)
     return cond
+
+
+def secuencia_dias_perturbados(
+    rng: np.random.Generator,
+    n_dias: int,
+    sigma_tmin: float = SIGMA_TMIN_C,
+    sigma_tmax: float = SIGMA_TMAX_C,
+    phi_tmin: float = PHI_TMIN,
+    phi_tmax: float = PHI_TMAX,
+    sigma_ea_frac: float = SIGMA_EA_RESID_FRAC,
+    phi_ea: float = PHI_EA,
+) -> list[CondicionesClimaticas]:
+    """Secuencia de ``n_dias`` días con persistencia AR(1):
+
+        a[d] = phi * a[d-1] + sqrt(1 - phi^2) * sigma * e[d],   e ~ N(0, 1)
+
+    (la varianza estacionaria de a es sigma^2). Es la realización ambiental
+    que reciben LAS TRES estrategias en una corrida Monte Carlo (diseño
+    pareado). Parámetros de NASA POWER 2005-2024 (ver simplificación 3).
+    """
+    a = np.array([rng.normal(0.0, sigma_tmin), rng.normal(0.0, sigma_tmax), rng.normal(0.0, sigma_ea_frac)])
+    phi = np.array([phi_tmin, phi_tmax, phi_ea])
+    sig = np.array([sigma_tmin, sigma_tmax, sigma_ea_frac])
+    dias = []
+    for d in range(n_dias):
+        if d > 0:
+            a = phi * a + np.sqrt(1.0 - phi**2) * sig * rng.normal(0.0, 1.0, 3)
+        dias.append(_dia_desde_anomalias(float(a[0]), float(a[1]), float(a[2])))
+    return dias
 
 
 def ambiente_en(t_h: float, clima_dias) -> tuple[float, float, float]:

@@ -9,30 +9,27 @@ Trabajo de grado - Sistema de supervisión digital para el secado de café.
 (ver Guia_vigente_TG_Secado_Cafe_Pardo_Zambrano.pdf, sección 3,
 "Arquitectura modular objetivo" y "Prueba mínima del corte").
 
-Qué cambió respecto a v0
--------------------------
-v0 demostró que la comunicación Modbus TCP funciona en ambos sentidos
-con una sola variable de proceso (T_process) y un solo comando
-(heater_cmd), usando una planta de juguete cableada directo en el bucle
-del servidor. Esta v1 dos cosas:
+Estado actual (6 oct 2026)
+---------------------------
+- La planta está detrás de una **interfaz modular** (clase ``Plant``):
+  el bucle del servidor solo llama ``plant.step(...)``. La planta por
+  defecto es ``ModeloSecadoPlant`` (``planta_secado.py``): secador
+  eléctrico de 80 kg c.p.s. con resistencia de 6 kW, ventilador de
+  caudal variable, lecho de 20 cm por capas (Thompson) y cinética de
+  Roa-Cenicafé. ``ToyPlant`` (la planta de juguete de v0, 9-10 sept
+  2026) queda solo para probar la comunicación (``--plant toy``).
+- Mapa de 24 registros (0-23), tabla abajo. Resumen para el documento
+  en ``docs/tabla_variables.md``.
+- Pérdida de comunicación cubierta en los dos sentidos: watchdog de
+  Python (``safety_ok``) y ``heartbeat`` para CODESYS.
+- Lazo térmico local (corrección del 4 oct 2026, ver
+  ``planta_secado.py``): con factor de aceleración alto el termostato
+  del ducto corre en Python cada 1 s de modelo y CODESYS supervisa.
 
-    1. Separa la planta detrás de una **interfaz modular** (clase
-       ``Plant``, ver abajo): el bucle del servidor ya no conoce la
-       física, solo llama ``plant.step(...)``. Así, cuando
-       ``modelo_secado.py`` esté listo para conectarse, se agrega una
-       clase ``ModeloSecadoPlant(Plant)`` nueva y se cambia una línea
-       en ``main()`` — el mapa de registros y el lado CODESYS no
-       cambian. Esto es exactamente el desacople controlador/planta
-       que pide la sección 3 de la guía vigente.
-    2. Amplía el mapa de registros con ``fan_cmd``, ``RH_ambient``,
-       ``plant_mode`` y ``safety_ok`` (ver tabla abajo), y agrega el
-       ítem que quedaba pendiente del checklist de la guía:
-       comportamiento ante pérdida de comunicación (watchdog).
-
-Sigue sin ser el modelo real de secado de café — eso lo hace
-``modelo_secado.py`` — esta v1 sigue usando una planta de juguete
-(``ToyPlant``), pero ahora una que cumple la interfaz que ``modelo_secado.py``
-tendrá que implementar en la siguiente iteración.
+Historial: v0 (9-10 sept 2026) = una variable y un comando con planta de
+juguete; v1 (14-15 sept) = interfaz ``Plant`` + watchdog; 23 sept =
+primera planta física; 29 sept = modelo Roa + secador eléctrico; 4 oct =
+lazo térmico local; 5 oct = caudal variable (registros 20-23).
 
 Arquitectura y por qué Python es el servidor (slave)
 ------------------------------------------------------
@@ -73,10 +70,19 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
     15          flow_dir_cmd  WORD (0 o 1)      -        CODESYS -> Python (29 sept 2026): sentido
                                                            del aire en el lecho, 0=abajo->arriba,
                                                            1=invertido (arriba->abajo)
+    18-19       heater_duty   REAL (float32)    %        Python -> CODESYS (4 oct 2026): fraccion
+                                                           del ultimo ciclo con la resistencia
+                                                           encendida (lazo termico local; ver
+                                                           planta_secado.py, "CORRECCION 4 oct 2026")
     16-17       M_coffee_max  REAL (float32)    % b.h.   Python -> CODESYS (29 sept 2026): humedad
                                                            de la capa más húmeda del lecho
 
-    Direcciones 18-19 quedan libres para futuras variables.
+    20          fan_speed_pct WORD (0-100)      %        CODESYS -> Python (5 oct 2026): consigna de
+                                                           caudal del ventilador (manipulada 2), % del
+                                                           nominal (8 m3/min). 0 = no configurado ->
+                                                           100 %; 1-29 se recorta a 30 % (mínimo).
+    22-23       caudal        REAL (float32)    m3/min   Python -> CODESYS (5 oct 2026): caudal real
+                                                           aplicado (0 con el ventilador apagado)
 
     RH_ambient vs RH_process (separados el 29 sept 2026)
     ------------------------------------------------------
@@ -160,8 +166,9 @@ primera vez que se hizo funcionar esto.
 Cómo correrlo
 --------------
     pip install -r requirements.txt
-    python modbus_server.py                  # 127.0.0.1:502 (puede requerir admin en Windows)
-    python modbus_server.py --port 5020       # alternativa sin privilegios
+    python modbus_server.py      # = --plant modelo --factor-aceleracion 540 --port 5020
+    python modbus_server.py --factor-aceleracion 1 --lazo-termico plc   # verificación a tiempo real
+    python modbus_server.py --plant toy                                 # solo prueba de comunicación
 
 IMPORTANTE: no dejes más de una instancia corriendo a la vez (verifica
 con ``netstat -an | findstr 5020`` en Windows antes de arrancar otra) —
@@ -207,13 +214,16 @@ REG_HEARTBEAT = 12     # 1 registro: contador 0-65535, incrementa cada ciclo del
 REG_RH_PROCESS = 13    # 2 registros: float32, HR dentro de la cámara (29 sept 2026)
 REG_FLOW_DIR_CMD = 15  # 1 registro: 0/1, sentido del aire en el lecho (CODESYS -> Python)
 REG_M_COFFEE_MAX = 16  # 2 registros: float32, humedad de la capa más húmeda (% b.h.)
-NUM_HOLDING_REGS = 20  # margen para variables futuras
+REG_HEATER_DUTY = 18   # 2 registros: float32, ciclo de trabajo de la resistencia [%] (4 oct 2026)
+REG_FAN_SPEED_CMD = 20 # 1 registro: consigna de caudal 0-100 % (CODESYS -> Python, 5 oct 2026)
+REG_CAUDAL = 22        # 2 registros: float32, caudal real [m3/min] (Python -> CODESYS, 5 oct 2026)
+NUM_HOLDING_REGS = 24  # 0-23 (5 oct 2026: caudal variable)
 
 HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
 
 # Direcciones que, al ser escritas por el cliente Modbus (CODESYS), cuentan
 # como "señal de vida" para el watchdog de comunicación.
-ACTUATOR_ADDRESSES = frozenset({REG_HEATER_CMD, REG_FAN_CMD, REG_PLANT_MODE, REG_FLOW_DIR_CMD})
+ACTUATOR_ADDRESSES = frozenset({REG_HEATER_CMD, REG_FAN_CMD, REG_PLANT_MODE, REG_FLOW_DIR_CMD, REG_FAN_SPEED_CMD})
 
 PLANT_MODE_RUN = 0
 PLANT_MODE_HOLD = 1
@@ -275,6 +285,7 @@ class PlantInputs:
     plant_mode: int
     comm_lost: bool
     flow_dir_cmd: int = 0  # 0 = aire de abajo hacia arriba, 1 = invertido
+    fan_speed_pct: int = 0  # consigna de caudal 0-100 % (0 = no configurado -> 100 %)
 
 
 @dataclass
@@ -297,6 +308,11 @@ class PlantOutputs:
     # Mismo criterio que m_coffee_pct: None -> ToyPlant no lo publica.
     rh_process_pct: float | None = None
     m_coffee_max_pct: float | None = None
+    heater_duty_pct: float | None = None
+    caudal_m3_min: float | None = None
+    # Caudal real aplicado [m3/min] -- 22-23 (5 oct 2026). None -> ToyPlant.
+    # Ciclo de trabajo de la resistencia en el ultimo ciclo [%] -- 18-19
+    # (4 oct 2026, lazo termico local). None -> ToyPlant.
     # Humedad de la capa más húmeda del lecho [% b.h.] -- 16-17. None -> ToyPlant.
     # HR del aire DENTRO de la cámara [%] -- direcciones 13-14 (29 sept
     # 2026). rh_ambient_pct es SOLO la HR exterior. None -> ToyPlant.
@@ -310,11 +326,10 @@ class Plant(abc.ABC):
     servidor Modbus (``bucle_planta``) solo conoce esta interfaz, nunca
     la física concreta. Eso permite:
 
-        - Seguir usando ``ToyPlant`` (dinámica de juguete) para pruebas
-          rápidas de comunicación, como en v0.
-        - Cambiar a una implementación respaldada por
-          ``modelo_secado.py`` (cinética real de secado + dinámica
-          térmica) sin tocar el mapa de registros ni el lado CODESYS.
+        - Usar ``ModeloSecadoPlant`` (planta_secado.py, el modelo del
+          proyecto) o ``ToyPlant`` (dinámica de juguete, solo para
+          pruebas de comunicación) sin tocar el mapa de registros ni el
+          lado CODESYS.
         - Más adelante, cambiar a una implementación que en vez de
           calcular la física lea sensores reales de la secadora física,
           de nuevo sin tocar CODESYS (ver tabla de capas, sección 3 de
@@ -409,6 +424,9 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_RH_PROCESS, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_FLOW_DIR_CMD, [0])
     slave_ctx.setValues(3, REG_M_COFFEE_MAX, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_HEATER_DUTY, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_FAN_SPEED_CMD, [0])
+    slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(0.0))
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -429,6 +447,7 @@ def bucle_planta(
         fan_cmd_bruto = slave_ctx.getValues(3, REG_FAN_CMD, count=1)[0]
         plant_mode = slave_ctx.getValues(3, REG_PLANT_MODE, count=1)[0]
         flow_dir_bruto = slave_ctx.getValues(3, REG_FLOW_DIR_CMD, count=1)[0]
+        fan_speed_bruto = slave_ctx.getValues(3, REG_FAN_SPEED_CMD, count=1)[0]
 
         comm_lost = watched_block.seconds_since_last_actuator_write() > WATCHDOG_TIMEOUT_S
         heater_cmd = 0 if comm_lost else heater_cmd_bruto
@@ -437,7 +456,8 @@ def bucle_planta(
         outputs = plant.step(
             periodo_s,
             PlantInputs(heater_cmd=heater_cmd, fan_cmd=fan_cmd, plant_mode=plant_mode, comm_lost=comm_lost,
-                        flow_dir_cmd=0 if comm_lost else flow_dir_bruto),
+                        flow_dir_cmd=0 if comm_lost else flow_dir_bruto,
+                        fan_speed_pct=fan_speed_bruto),
         )
 
         slave_ctx.setValues(3, REG_T_PROCESS, float_to_registers(outputs.t_process_c))
@@ -451,6 +471,10 @@ def bucle_planta(
             slave_ctx.setValues(3, REG_RH_PROCESS, float_to_registers(outputs.rh_process_pct))
         if outputs.m_coffee_max_pct is not None:
             slave_ctx.setValues(3, REG_M_COFFEE_MAX, float_to_registers(outputs.m_coffee_max_pct))
+        if outputs.heater_duty_pct is not None:
+            slave_ctx.setValues(3, REG_HEATER_DUTY, float_to_registers(outputs.heater_duty_pct))
+        if outputs.caudal_m3_min is not None:
+            slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(outputs.caudal_m3_min))
 
         # Heartbeat: se incrementa y publica SIEMPRE, incluso con
         # comm_lost=True -- es la señal de "el proceso Python sigue
@@ -463,14 +487,18 @@ def bucle_planta(
         m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
         tiempo_str = f"{outputs.tiempo_proceso_h:6.2f}h" if outputs.tiempo_proceso_h is not None else "    n/a"
         rh_proc_str = f"{outputs.rh_process_pct:5.1f}%" if outputs.rh_process_pct is not None else "  n/a"
+        duty_str = f"{outputs.heater_duty_pct:5.1f}%" if outputs.heater_duty_pct is not None else "  n/a"
+        caudal_str = f"{outputs.caudal_m3_min:4.1f}" if outputs.caudal_m3_min is not None else " n/a"
         log.info(
-            "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | RH_process=%s | M_coffee=%s | heater_cmd=%s | "
+            "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | RH_process=%s | M_coffee=%s | heater_duty=%s | caudal=%s m3/min | heater_cmd=%s | "
             "fan_cmd=%s | plant_mode=%s | safety=%s | heartbeat=%s",
             tiempo_str,
             outputs.t_process_c,
             outputs.rh_ambient_pct,
             rh_proc_str,
             m_coffee_str,
+            duty_str,
+            caudal_str,
             heater_cmd_bruto,
             fan_cmd_bruto,
             plant_mode,
@@ -484,7 +512,7 @@ def main() -> None:
     global WATCHDOG_TIMEOUT_S
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default="127.0.0.1", help="IP donde escucha el servidor (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=502, help="Puerto TCP (default: 502; usar 5020 si 502 requiere permisos de administrador)")
+    parser.add_argument("--port", type=int, default=5020, help="Puerto TCP (default: 5020, el que usa el proyecto CODESYS; 502 requiere permisos de administrador en Windows)")
     parser.add_argument("--periodo", type=float, default=1.0, help="Periodo de actualización de la planta, en segundos (default: 1.0)")
     parser.add_argument(
         "--watchdog-timeout",
@@ -495,19 +523,32 @@ def main() -> None:
     parser.add_argument(
         "--plant",
         choices=["toy", "modelo"],
-        default="toy",
+        default="modelo",
         help=(
-            "Planta a usar: 'toy' = planta de juguete (default, sin cambios de comportamiento). "
-            "'modelo' = ModeloSecadoPlant (planta_secado.py), cinetica Roa-Cenicafe + dinamica termica "
-            "(secador electrico 80 kg c.p.s., 6 kW; con factor de aceleracion alto el control todo/nada oscila, ver planta_secado.py)."
+            "Planta a usar: 'modelo' (default) = ModeloSecadoPlant (planta_secado.py): secador electrico de "
+            "80 kg c.p.s., 6 kW, lecho Thompson + cinetica Roa-Cenicafe. 'toy' = planta de juguete de v0, "
+            "solo para probar la comunicacion."
         ),
     )
     parser.add_argument(
         "--factor-aceleracion",
         type=float,
-        default=3600.0,
-        help="Solo con --plant modelo: horas de modelo por segundo de reloj real (default: 3600.0, ver planta_secado.py)",
+        default=540.0,
+        help="Solo con --plant modelo: segundos de modelo por segundo de reloj real (default: 540 = 0.15 h de modelo por segundo, la demo con el HMI; 1 = tiempo real)",
     )
+    parser.add_argument(
+        "--lazo-termico",
+        choices=["auto", "plc", "local"],
+        default="auto",
+        help=(
+            "Solo con --plant modelo. 'plc' = CODESYS decide heater_cmd (valido solo a tiempo real, "
+            "--factor-aceleracion <= ~10). 'local' = termostato del ducto en Python cada 1 s de modelo; "
+            "CODESYS supervisa (RUN/HOLD, ventilador, flujo, parada). 'auto' (default) elige segun el "
+            "factor de aceleracion. Ver planta_secado.py, 'CORRECCION 4 oct 2026'."
+        ),
+    )
+    parser.add_argument("--setpoint", type=float, default=50.0,
+                        help="Solo con --lazo-termico local: setpoint del termostato del ducto [C] (default 50)")
     args = parser.parse_args()
     WATCHDOG_TIMEOUT_S = args.watchdog_timeout
 
@@ -518,7 +559,14 @@ def main() -> None:
         # completamente cargado) para evitar un import circular.
         from planta_secado import ModeloSecadoPlant, ParametrosModeloSecadoPlant
 
-        plant: Plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=args.factor_aceleracion))
+        plant: Plant = ModeloSecadoPlant(
+            ParametrosModeloSecadoPlant(
+                factor_aceleracion=args.factor_aceleracion,
+                lazo_termico=args.lazo_termico,
+                setpoint_c=args.setpoint,
+            ),
+            periodo_s=args.periodo,
+        )
         log.info(
             "Usando ModeloSecadoPlant (secador electrico 80 kg c.p.s., lecho Thompson + Roa-Cenicafe) con factor_aceleracion=%.1f",
             args.factor_aceleracion,
@@ -539,7 +587,8 @@ def main() -> None:
         "Mapa: hr[0-1]=T_process | hr[2]=heater_cmd | hr[3]=fan_cmd | "
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
         "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2) | hr[13-14]=RH_process | "
-        "hr[15]=flow_dir_cmd | hr[16-17]=M_coffee_max"
+        "hr[15]=flow_dir_cmd | hr[16-17]=M_coffee_max | hr[18-19]=heater_duty | "
+        "hr[20]=fan_speed_pct | hr[22-23]=caudal"
     )
     log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")

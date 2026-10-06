@@ -1,12 +1,47 @@
 # /codesys
 
-Proyecto CODESYS: lógica de control, máquina de estados y HMI.
+Controlador de supervisión en CODESYS V3.5 SP9 (runtime CODESYS Control Win
+V3): cliente Modbus TCP de la planta Python, lógica de supervisión, alarmas
+y HMI. Estado al 6 oct 2026.
 
-Contenido esperado:
-- Máquina de estados del proceso de secado.
-- Lógica de control (PID).
-- HMI con tendencias, alarmas y estado.
-- Configuración de comunicación (Modbus TCP u otra interfaz) con Python y FluidSIM.
+## Archivos
+
+| Archivo | Qué es |
+|---|---|
+| `PLC_PRG_v3.st` | **Programa vigente** (5 oct 2026). RUN/HOLD, ventilador y consigna de caudal (`fan_speed_pct`), inversión del aire cada 6 h (`flow_dir_cmd`, piloto `aire_invertido`), parada por humedad (promedio ≤ 11 % y capa más húmeda ≤ 12 % b.h.) con `fin_secado` enclavado y `reset_lote`, watchdog `heartbeat`/`comm_error`, selección `lazo_local` (termostato en Python en la demo acelerada / en el PLC a tiempo real). Pendiente de cargarlo en el proyecto. |
+| `PLC_PRG_v2.st` | Versión anterior (4 oct 2026), sin caudal variable. Histórico. |
+| `archivo_codesys/SecadoCafe_ModbusV1.project` | Proyecto CODESYS SP9 (HMI, canales Modbus, IO Mapping). Se actualiza al cargar v3. |
+| `ModbusPhytoon.project` | Proyecto v0 (SP15, 10 sept 2026), ya no instalado. Histórico. |
+| `comunicacion_modbus.md` | Guía paso a paso del cliente Modbus en CODESYS, código ST y **sección 0 con los errores que más tiempo costaron** (léela si algo deja de funcionar). Secciones 7–8: lazo térmico local y caudal variable. Es una bitácora: conserva el historial de cada cambio. |
+| `evidencia_*.png`, `ConcexionOPC.png` | Evidencias de comunicación, HMI, watchdog y prueba OPC con FluidSIM. |
+
+Mapa de registros y variables: `../docs/tabla_variables.md`.
+
+## Cómo se prueba
+
+1. `cd python` y `python modbus_server.py` (modelo, factor 540, puerto 5020).
+2. En CODESYS: el cliente Modbus apunta a `127.0.0.1:5020`; iniciar sesión y
+   RUN.
+3. Verificación a tiempo real (una vez, ~60 min):
+   `python modbus_server.py --factor-aceleracion 1 --lazo-termico plc` y
+   `lazo_local := FALSE` en el PLC; comparar T_process y energía con
+   `python/control_supervisado.py`.
+
+## Pendiente (6 oct 2026)
+
+- Cargar `PLC_PRG_v3` y crear los canales de caudal (dir. 20 escritura,
+  22–23 lectura) en el IO Mapping.
+- HMI final: caudal, `aire_invertido`, `fin_secado`, botón "Nuevo lote",
+  revisión de ergonomía visual; lámpara "Planta en funcionamiento" que
+  reaccione a `comm_error`.
+- "Nuevo lote" debe reiniciar también la planta en Python (falta un registro
+  de reinicio en `modbus_server.py`).
+- Verificación a tiempo real CODESYS vs. réplica (arriba).
+- Compuerta de inversión en FluidSIM vía OPC (ver `../fluidsim/README.md`).
+
+---
+
+# Historial (bitácora hasta el 24 sept 2026)
 
 ## Comunicación con Python
 
@@ -108,17 +143,3 @@ Con esto, el watchdog de pérdida de comunicación queda cerrado en los
 dos sentidos: Python detecta si CODESYS deja de escribir (`safety_ok`,
 ya desde el 14 sept), y CODESYS detecta si Python se cae (`comm_error`,
 hoy).
-
-**Pendiente:**
-- Subir a este repositorio el `.project` actualizado (con `M_coffee`,
-  `tiempo_proceso_h`, HMI, Trend corregido, y el watchdog de hoy).
-- Timeout del canal master en CODESYS (complementa a `heartbeat`, no
-  es indispensable ya que `heartbeat` cubre el mismo caso).
-- Máquina de estados (IDLE→CARGA→SECANDO→DESCARGA→IDLE), botones de
-  arranque/paro/emergencia, y los dos cilindros (carga/expulsión de
-  bandeja) + motor del ventilador en FluidSIM — hoy solo existe el
-  circuito mínimo de prueba (un botón → un cilindro).
-- Documentar la conexión OPC↔FluidSIM con el mismo nivel de detalle
-  que `comunicacion_modbus.md`.
-- Revisar la pareja de lámparas "Planta en funcionamiento": no
-  reacciona a `comm_error`, se queda en verde con la alarma activa.

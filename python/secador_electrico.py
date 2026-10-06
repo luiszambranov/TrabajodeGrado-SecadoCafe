@@ -38,6 +38,7 @@ class EstadoSecador:
     m_capa_max_bh_pct: float   # capa más húmeda
     m_capa_min_bh_pct: float   # capa más seca
     t_salida_c: float          # aire a la salida del lecho
+    caudal_m3_min: float = 0.0 # caudal de aire real (manipulada 2) [m3/min]
 
 
 @dataclass
@@ -71,9 +72,10 @@ class SecadorElectrico:
         self.lecho = LechoThompson(self.p, m0_bh_pct=m0_bh_pct, t_inicial_c=t_amb0)
         self.c = Contadores()
         self._t_salida = t_amb0
+        self._caudal_m3_min = 0.0
 
     def paso(self, heater_cmd: int, fan_cmd: int, dt_h: float, control=None, dt_ciclo_s: float = 1.0,
-             flujo_invertido: bool = False) -> EstadoSecador:
+             flujo_invertido: bool = False, fan_frac: float = 1.0) -> EstadoSecador:
         """Avanza ``dt_h`` horas.
 
         Sin ``control``: heater_cmd/fan_cmd constantes en el paso (uso desde
@@ -87,8 +89,10 @@ class SecadorElectrico:
         cada segundo.
         """
         t_amb, rh_amb, ea = amb.ambiente_en(self.t_h, self.clima)
+        ff = self.p.limitar_fan_frac(fan_frac) if fan_cmd else 0.0
+        self._caudal_m3_min = self.p.caudal_m3_s * 60.0 * ff
         if control is None:
-            self.t_process, p_res = paso_plenum(self.t_process, t_amb, heater_cmd, fan_cmd, dt_h, self.p)
+            self.t_process, p_res = paso_plenum(self.t_process, t_amb, heater_cmd, fan_cmd, dt_h, self.p, ff)
             t_lecho = self.t_process
             e_res = p_res * dt_h
         else:
@@ -97,15 +101,15 @@ class SecadorElectrico:
             suma_t = e_res = 0.0
             for _ in range(n):
                 hc = control(self.t_process)
-                self.t_process, p_res = paso_plenum(self.t_process, t_amb, hc, fan_cmd, h, self.p)
+                self.t_process, p_res = paso_plenum(self.t_process, t_amb, hc, fan_cmd, h, self.p, ff)
                 suma_t += self.t_process
                 e_res += p_res * h
             t_lecho = suma_t / n
-        r = self.lecho.paso(t_lecho, ea, fan_cmd, dt_h, self.p.masa_aire_kg_s(t_amb), flujo_invertido)
+        r = self.lecho.paso(t_lecho, ea, fan_cmd, dt_h, self.p.masa_aire_kg_s(t_amb, ff), flujo_invertido)
         self._t_salida = r.t_salida_c
 
         self.c.energia_resistencia_kwh += e_res
-        self.c.energia_ventilador_kwh += self.p.potencia_ventilador_kw * dt_h * (1 if fan_cmd else 0)
+        self.c.energia_ventilador_kwh += self.p.potencia_ventilador_frac_kw(ff) * dt_h if fan_cmd else 0.0
         self.c.agua_evaporada_kg += r.agua_evaporada_kg
         self.c.horas_grano_sobre_50c += dt_h if r.t_grano_max_c > 50.0 + 1e-6 else 0.0
         self.c.horas_rehumectacion += dt_h if r.rehumectacion else 0.0
@@ -126,4 +130,5 @@ class SecadorElectrico:
             m_capa_max_bh_pct=self.lecho.m_bh_max,
             m_capa_min_bh_pct=self.lecho.m_bh_min,
             t_salida_c=self._t_salida,
+            caudal_m3_min=self._caudal_m3_min,
         )

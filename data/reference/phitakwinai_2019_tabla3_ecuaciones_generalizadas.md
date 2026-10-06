@@ -1,5 +1,7 @@
 # Tabla 3 (Phitakwinai et al., 2019) — ecuaciones generalizadas del modelo Modified-Midilli
 
+> **Uso actual (6 oct 2026):** histórico. Fueron la cinética de la planta del 23 sept 2026 (`python/legacy/cinetica_dinamica.py`). Hoy Phitakwinai et al. (2019) solo se usa como validación (Tabla 2, caso V1).
+
 Válidas para T en °C (50-70) y RH en % (10-30). r² de cada regresión
 polinómica de segundo orden, tal como reportado por los autores.
 
@@ -34,7 +36,7 @@ Verificación:
 Una regresión propia de segundo orden sobre las 9 filas de la Tabla 2
 reproduce los demás coeficientes y da un término T·RH ≈ 1.0e-7. Se
 concluye que el exponente impreso (-4) es una errata y el código
-(`python/cinetica_dinamica.py`, `k_generalizado`) usa:
+(`python/legacy/cinetica_dinamica.py`, `k_generalizado`) usa:
 
 ```
 k = -0.41202 + 0.014550*T - 6.3162e-4*RH + 1.0318e-7*T*RH

@@ -57,7 +57,10 @@ from secador_electrico import Contadores, SecadorElectrico
 
 @dataclass
 class ParametrosControl:
-    setpoint_c: float = 50.0          # González et al. (2010): T máx. 50 °C
+    setpoint_c: object = 50.0
+    """Setpoint de T_process [°C]: número fijo (50 °C, González et al., 2010) o
+    función f(t_h, m_prom_bh, m_max_bh) -> °C para perfiles escalonados
+    (perfiles_termicos.py)."""
     histeresis_c: float = 0.0         # 0 = todo/nada puro, igual a PLC_PRG actual
     humedad_parada_bh_pct: float = roa.HUMEDAD_OBJETIVO_BH_PCT
     humedad_max_capa_bh_pct: float = 12.0
@@ -69,6 +72,11 @@ class ParametrosControl:
     dt_control_h: float = 1.0 / 60.0  # paso del lecho: 1 min
     dt_ciclo_s: float = 1.0           # ciclo del lazo térmico: 1 s, igual al periodo
                                       # del servidor Modbus (modbus_server --periodo 1.0)
+    caudal_frac: object = 1.0
+    """Manipulada 2 (5 oct 2026): fracción del caudal nominal. Un número fijo
+    (1.0 = 8 m3/min, 0.1 m3/min/kg; González et al., 2010) o una función
+    f(t_h, m_prom_bh, m_max_bh) -> fracción, para perfiles de caudal. Se
+    recorta a [ParametrosSecador.caudal_min_frac, 1]."""
 
 
 @dataclass
@@ -93,24 +101,43 @@ class ResultadoSupervisada:
     _masa_cps: float = 80.0
 
 
+def _evaluar(valor, s):
+    return valor(s.t_h, s.lecho.m_bh_promedio, s.lecho.m_bh_max) if callable(valor) else valor
+
+
 def simular_supervisada(
     clima_dias,
     pc: ParametrosControl | None = None,
     p: ParametrosSecador | None = None,
     t_max_h: float = 400.0,
     guardar_traza: bool = False,
+    m0_bh_pct: float = roa.M0_BH_PCT,
 ) -> ResultadoSupervisada:
     pc = pc or ParametrosControl()
-    s = SecadorElectrico(clima_dias, p)
-    estado_heater = {"on": 0}
+    s = SecadorElectrico(clima_dias, p, m0_bh_pct=m0_bh_pct)
+    st = {"on": 0, "sp": 50.0, "iae": 0.0, "ise": 0.0, "max_sobre": 0.0,
+          "en_regimen": False, "err_reg": 0.0, "n_reg": 0}
+    dt_h_ciclo = pc.dt_ciclo_s / 3600.0
 
     def todo_nada(t_process: float) -> int:
-        # Mismo criterio que PLC_PRG, evaluado en cada ciclo.
-        if t_process < pc.setpoint_c - pc.histeresis_c:
-            estado_heater["on"] = 1
-        elif t_process >= pc.setpoint_c + pc.histeresis_c:
-            estado_heater["on"] = 0
-        return estado_heater["on"]  # el enclavamiento con fan lo aplica paso_plenum
+        # Mismo criterio que PLC_PRG, evaluado en cada ciclo; además acumula
+        # las métricas de control de la Guía (sección 11): IAE, ISE,
+        # sobreimpulso y error medio en régimen.
+        sp = st["sp"]
+        err = sp - t_process
+        st["iae"] += abs(err) * dt_h_ciclo
+        st["ise"] += err * err * dt_h_ciclo
+        if not st["en_regimen"] and abs(err) <= 0.5:   # llegó a la banda de ±0.5 °C
+            st["en_regimen"] = True
+        if st["en_regimen"]:
+            st["max_sobre"] = max(st["max_sobre"], -err)
+            st["err_reg"] += err
+            st["n_reg"] += 1
+        if t_process < sp - pc.histeresis_c:
+            st["on"] = 1
+        elif t_process >= sp + pc.histeresis_c:
+            st["on"] = 0
+        return st["on"]  # el enclavamiento con fan lo aplica paso_plenum
 
     traza = [] if guardar_traza else None
     t_obj = math.inf
@@ -126,13 +153,23 @@ def simular_supervisada(
             if debe != invertido:
                 invertido = debe
                 n_inv += 1
+        nuevo_sp = float(_evaluar(pc.setpoint_c, s))
+        if abs(nuevo_sp - st["sp"]) > 1e-9 and st["n_reg"] > 0:
+            st["en_regimen"] = False   # cambio de setpoint: nuevo transitorio
+        st["sp"] = nuevo_sp
+        ff = _evaluar(pc.caudal_frac, s)
         e = s.paso(0, 1, pc.dt_control_h, control=todo_nada, dt_ciclo_s=pc.dt_ciclo_s,
-                   flujo_invertido=invertido)
+                   flujo_invertido=invertido, fan_frac=ff)
         if traza is not None:
             traza.append((e.t_h, e.t_ambiente_c, e.t_process_c, e.rh_process_pct, e.m_coffee_bh_pct,
-                          e.m_capa_min_bh_pct, e.m_capa_max_bh_pct, int(invertido)))
+                          e.m_capa_min_bh_pct, e.m_capa_max_bh_pct, int(invertido), st["sp"], e.caudal_m3_min))
     r = ResultadoSupervisada(t_obj, s.lecho.m_bh_promedio, s.lecho.m_bh_max, s.lecho.m_bh_min, n_inv, s.c, traza)
     r._masa_cps = s.p.masa_cps_kg
+    r.iae_c_h = st["iae"]
+    r.ise_c2_h = st["ise"]
+    r.sobreimpulso_c = st["max_sobre"]
+    r.error_medio_regimen_c = st["err_reg"] / st["n_reg"] if st["n_reg"] else math.nan
+    r.t_fin_h = s.t_h
     return r
 
 

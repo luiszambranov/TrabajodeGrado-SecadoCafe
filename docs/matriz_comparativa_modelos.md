@@ -1,6 +1,16 @@
 # Matriz comparativa de modelos de secado
 
-Semana 4 - Fundamentos + primer hilo ejecutable
+Semana 4 - Fundamentos + primer hilo ejecutable (7 sept 2026)
+
+> **Decisión final (29 sept 2026):** ninguno de estos modelos quedó en la
+> planta. Se eligió el modelo de **Roa–Cenicafé** (isoterma de Trejos et al.,
+> 1989 + capa delgada de SECAFÉ, Parra-Coronado et al., 2008), que tiene la
+> forma de Page, MR = exp(−k·t^q), con k dependiente de la temperatura y la
+> humedad del aire. Es el único que cubre el dominio de las tres estrategias
+> (16–55 °C, 40–100 % HR) y está medido en café pergamino colombiano.
+> Phitakwinai et al. (2019) quedó como validación independiente. Razones en
+> `docs/evolucion_del_modelo.md`. Esta matriz se conserva como antecedente
+> para el estado del arte.
 
 Comparación de 5 modelos de cinética de secado en capa delgada (razón de
 humedad MR), candidatos para el modelo Python de la planta. La selección
@@ -41,8 +51,8 @@ por los autores — quedó digitalizada en
 `data/reference/phitakwinai_2019_tabla2_parametros.csv`. Se usó la
 condición T=60 °C/RH=20 % (mejor r² individual del paper: 0.9997) como
 curva de referencia para ajustar nuestras propias implementaciones de
-Newton, Logarítmico y Midilli modificado (`python/ajuste_modelos.py`,
-`python/AjusteModelos.ipynb`). El resultado confirma la lectura de esta
+Newton, Logarítmico y Midilli modificado (`python/legacy/ajuste_modelos.py`,
+`python/legacy/AjusteModelos.ipynb`). El resultado confirma la lectura de esta
 matriz: Midilli modificado reproduce la referencia casi exactamente
 (R²≈1), mientras Newton y Logarítmico se desvían visiblemente en las
 colas de la curva. La Tabla 3 del paper (ecuaciones generalizadas de k,

@@ -12,51 +12,28 @@ del proyecto, cerrando el lazo:
                            Thompson + Roa-Cenicafe) -> T_process, RH_process,
                            M_coffee
 
-ACTUALIZACION 29 sept 2026 (tarde): lote de 80 kg c.p.s., resistencia
-electrica de 6 kW con enclavamiento de flujo (heater AND fan), caudal
-0.1 m3/min/kg y lecho de 20 cm (Gonzalez et al., 2010). La fisica vive en
-secador_electrico.py, compartida con la replica de control en Python
-(control_supervisado.py) que usa la campana Monte Carlo.
-
-ACTUALIZACION 29 sept 2026:
-    - La cinetica pasa de cinetica_dinamica.py (Phitakwinai et al. 2019,
-      valido solo 50-70 C / 10-30 % HR) a cinetica_roa.py (isoterma de
-      Trejos et al. 1989 + capa delgada de Roa, SECAFE 2008), el modelo
-      unico de las tres estrategias. Phitakwinai queda como validacion.
-    - M0 = 55 % b.h. y humedad de equilibrio Me(T,HR) calculada por la
-      isoterma (ya no los valores "de relleno" 50 %/12 % de modelo_secado).
-    - Se separan RH_ambient (HR del aire exterior) y RH_process (HR del
-      aire dentro de la camara, la que recibe el cafe); cada una con su
-      registro Modbus (ver modbus_server.py).
-    - El ambiente puede ser una secuencia de dias (``clima_dias``) para
-      que la planta reciba la misma realizacion Monte Carlo que las
-      lineas base.
+Configuracion (vigente desde el 29 sept 2026): lote de 80 kg c.p.s.,
+M0 = 55 % b.h., resistencia electrica de 6 kW con enclavamiento de flujo
+(heater AND fan), caudal nominal 0.1 m3/min/kg (8 m3/min, variable de 30
+a 100 % desde el 5 oct 2026) y lecho de 20 cm (Gonzalez et al., 2010). La
+fisica vive en secador_electrico.py y es la MISMA que usa la replica de
+control en Python (control_supervisado.py) de la campana Monte Carlo.
+Publica RH_ambient (aire exterior) y RH_process (aire de la camara) por
+separado, y acepta una secuencia de dias de clima (``clima_dias``) para
+recibir la misma realizacion Monte Carlo que las lineas base.
 
 Trabajo de grado - Sistema de supervision digital para el secado de cafe.
-Etapa 4 del plan de implementacion escalonada (asesoria del 23 sept
-2026): "Implementar ModeloSecadoPlant(Plant) en modbus_server.py".
-Corresponde al item 3 pendiente de codesys/comunicacion_modbus.md,
-seccion 6 ("Conectar modelo_secado.py real").
 
-ESTADO: ESQUELETO (v0), no calibrado ni verificado end-to-end todavia.
-Antes de conectar esto a CODESYS falta, como minimo (Etapa 5 del plan):
-
-    1. [HECHO 29 sept] Consistencia dinamico vs estatico a T/RH
-       constantes: cinetica_roa.paso_humedad reproduce la solucion
-       analitica (error ~1e-14, ver smoke test de cinetica_roa.py).
-    2. [HECHO 29 sept] M0 = 55 % b.h. (cinetica_roa.M0_BH_PCT) y Me
-       calculada por isoterma; humedad objetivo 11 % b.h. como criterio
-       de parada (cinetica_roa.HUMEDAD_OBJETIVO_BH_PCT).
-    3. [HECHO 29 sept] Secador dimensionado con fuentes
-       (dinamica_termica.ParametrosSecador; ver
-       data/reference/secador_electrico_dimensionamiento.md).
-    4. Decidir el factor de aceleracion temporal real a usar en las
-       pruebas con CODESYS (ver mas abajo).
+Historial: el 23 sept 2026 esta clase reemplazo a ToyPlant con un primer
+modelo (Midilli modificado de Phitakwinai et al., 2019, hoy en
+python/legacy/); el 29 sept 2026 se paso al modelo unico de Roa-Cenicafe
+y al secador dimensionado con fuentes
+(data/reference/secador_electrico_dimensionamiento.md). Ver
+docs/evolucion_del_modelo.md.
 
 Factor de aceleracion temporal
 ----------------------------------
-modelo_secado.py y dinamica_termica.py trabajan en HORAS (un secado dura
-del orden de horas, hasta ~117 h para la linea base minima). El bucle
+El modelo trabaja en HORAS (un secado supervisado dura ~30-50 h). El bucle
 Modbus de modbus_server.py corre en segundos de RELOJ REAL (periodo_s,
 por defecto 1 s). Sin un factor de aceleracion, verificar unas pocas
 horas de secado en el HMI tomaria horas reales de prueba.
@@ -66,22 +43,59 @@ segundos) en horas de modelo:
 
     dt_h_modelo = (dt_s / 3600) * factor_aceleracion
 
-Con el valor por defecto (3600.0) y periodo_s=1 s, 1 segundo real de
-reloj equivale a 1 hora de modelo -- una corrida de secado de ~8 h
-(propuesta supervisada) se ve completa en ~8 segundos reales en el HMI.
-Limitacion importante (29 sept 2026): el plenum tiene una constante de
-tiempo de ~2 min. Con factor 3600 cada ciclo del servidor avanza 1 h de
-modelo con heater_cmd fijo, asi que un control todo/nada desde CODESYS
-oscila entre ~21 y ~63 C: sirve para ver el comportamiento cualitativo
-en el HMI, NO para resultados. La campana Monte Carlo usa la replica en
-Python (control_supervisado.py, ciclo de 1 s). La verificacion
-CODESYS vs. replica se hace a tiempo real (--factor-aceleracion 1)
-durante una ventana corta (p. ej. 60 min), comparando T_process y la
-energia de la resistencia.
+Valor de uso con el HMI: factor 540 (default de modbus_server.py), es
+decir 0.15 h de modelo por segundo real; un secado de ~32 h se ve en
+~3.5 min. Como el plenum tiene una constante de tiempo de ~106 s, con
+ese factor el termostato no puede cerrarse desde CODESYS (ver la
+correccion del 4 oct 2026, abajo). La verificacion CODESYS vs. replica
+se hace a tiempo real (--factor-aceleracion 1 --lazo-termico plc)
+durante una ventana corta (~60 min), comparando T_process y la energia
+de la resistencia.
+
+CORRECCION 4 oct 2026 -- lazo termico local (prueba con el tutor)
+--------------------------------------------------------------------
+Sintoma observado: con --factor-aceleracion 540 (0.15 h de modelo por
+segundo) T_process alternaba 22 C <-> 65 C en cada ciclo, RH_process
+7 % <-> 68 %, y el lecho recibia aire a 65 C la mitad del tiempo
+(resultado de secado invalido: grano > 50 C).
+
+Causa: problema de MUESTREO, no de la fisica. El plenum tiene una
+constante de tiempo tau = C/(m*cp) ~ 15/0.14 ~ 107 s, pero CODESYS solo
+puede decidir heater_cmd una vez por ciclo del servidor, es decir cada
+dt_modelo = periodo_s * factor (540 s con factor 540). Como
+dt_modelo >> tau, dentro de un mismo ciclo el plenum llega al equilibrio
+(63 C con resistencia, ~21 C sin ella) y el todo/nada de CODESYS ve
+siempre un extremo. Un lazo de control solo funciona si el periodo de
+muestreo es mucho menor que la constante de tiempo del proceso
+(regla practica T_s <= tau/10, es decir varias muestras por constante
+de tiempo; Astrom, K. J. & Wittenmark, B. (1997). Computer-Controlled
+Systems, 3.a ed. Prentice Hall -- seleccion del periodo de muestreo).
+A tiempo real (factor 1, T_s = 1 s) se cumple; con
+factor >= ~10 ya no.
+
+Solucion (arquitectura en dos niveles, como en un secador real):
+    - Nivel de campo (Python, "lazo_termico='local'"): el termostato
+      todo/nada del ducto se evalua cada 1 s de MODELO dentro del paso
+      del servidor, exactamente como lo hace la replica de Monte Carlo
+      (control_supervisado.py). El lecho avanza en sub-pasos de 1 min
+      con la temperatura media del plenum. => la planta que ve CODESYS
+      y la de la campana son IDENTICAS.
+    - Nivel de supervision (CODESYS): modo RUN/HOLD, ventilador,
+      inversion de flujo, parada por humedad, watchdog. En modo local
+      el heater_cmd de CODESYS NO actua sobre la resistencia (se
+      registra en el log); la resistencia la habilitan fan_cmd=1 y
+      plant_mode=RUN. Python publica el ciclo de trabajo de la
+      resistencia (heater_duty_pct, registros 18-19) para el HMI.
+    - lazo_termico='plc' conserva el comportamiento anterior (CODESYS
+      decide heater_cmd) y es el modo correcto para la verificacion a
+      tiempo real (--factor-aceleracion 1).
+    - lazo_termico='auto' (por defecto) elige 'plc' si el paso de
+      modelo por ciclo es <= tau/10 (~10 s) y 'local' en otro caso.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
@@ -90,6 +104,17 @@ import cinetica_roa as roa
 import generador_ambiente as amb
 from dinamica_termica import ParametrosSecador
 from secador_electrico import SecadorElectrico
+
+log = logging.getLogger(__name__)
+
+# Regla practica de muestreo: T_s <= tau/10 (Astrom & Wittenmark, 1997).
+FRACCION_TAU_MAX = 0.1
+
+
+def constante_tiempo_plenum_s(p: ParametrosSecador, t_amb_c: float = 20.0) -> float:
+    """tau = C_plenum / (m_aire*cp + UA) [s], con ventilador encendido."""
+    from dinamica_termica import CP_AIRE
+    return p.capacidad_plenum_kj_k / (p.masa_aire_kg_s(t_amb_c) * CP_AIRE + p.ua_plenum_kw_k)
 
 
 @dataclass
@@ -102,6 +127,12 @@ class ParametrosModeloSecadoPlant:
     clima_dias: Optional[Sequence[amb.CondicionesClimaticas]] = None
     # None -> [condiciones_nominales()] (repite el dia nominal). Para
     # Monte Carlo: la MISMA lista de dias que reciben las lineas base.
+    lazo_termico: str = "auto"
+    # 'auto' | 'plc' | 'local' -- ver "CORRECCION 4 oct 2026" arriba.
+    setpoint_c: float = 50.0          # termostato local (Gonzalez et al., 2010)
+    histeresis_c: float = 0.0         # igual a control_supervisado.ParametrosControl
+    dt_lecho_h: float = 1.0 / 60.0    # sub-paso del lecho: 1 min (igual a la replica)
+    dt_ciclo_s: float = 1.0           # ciclo del termostato local [s de modelo]
 
 
 class ModeloSecadoPlant(Plant):
@@ -112,9 +143,36 @@ class ModeloSecadoPlant(Plant):
     publica las salidas.
     """
 
-    def __init__(self, params: Optional[ParametrosModeloSecadoPlant] = None) -> None:
+    def __init__(self, params: Optional[ParametrosModeloSecadoPlant] = None, periodo_s: float = 1.0) -> None:
         self.params = params or ParametrosModeloSecadoPlant()
         self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
+        self._heater_on = 0
+        self.modo_lazo = self._resolver_modo(periodo_s)
+
+    def _resolver_modo(self, periodo_s: float) -> str:
+        modo = self.params.lazo_termico
+        tau_s = constante_tiempo_plenum_s(self.params.secador)
+        dt_modelo_s = periodo_s * self.params.factor_aceleracion
+        if modo == "auto":
+            modo = "plc" if dt_modelo_s <= FRACCION_TAU_MAX * tau_s else "local"
+        if modo not in ("plc", "local"):
+            raise ValueError(f"lazo_termico debe ser 'auto', 'plc' o 'local' (recibido: {modo!r})")
+        if modo == "plc" and dt_modelo_s > FRACCION_TAU_MAX * tau_s:
+            log.warning(
+                "lazo_termico='plc' con %.0f s de modelo por ciclo y tau del plenum = %.0f s: el todo/nada de "
+                "CODESYS va a oscilar entre los extremos (use --lazo-termico local o --factor-aceleracion <= %.1f).",
+                dt_modelo_s, tau_s, FRACCION_TAU_MAX * tau_s / periodo_s)
+        log.info("Lazo termico: %s (tau plenum = %.0f s, paso de modelo por ciclo = %.0f s)", modo, tau_s, dt_modelo_s)
+        return modo
+
+    def _termostato(self, t_process: float) -> int:
+        """Todo/nada local, mismo criterio que control_supervisado.todo_nada."""
+        sp, hy = self.params.setpoint_c, self.params.histeresis_c
+        if t_process < sp - hy:
+            self._heater_on = 1
+        elif t_process >= sp + hy:
+            self._heater_on = 0
+        return self._heater_on
 
     @property
     def contadores(self):
@@ -127,11 +185,32 @@ class ModeloSecadoPlant(Plant):
         # HOLD explicito de CODESYS tambien fuerza heater/fan a 0 (mismo
         # criterio que ToyPlant; comm_lost ya viene resuelto por el
         # watchdog de modbus_server.py).
-        heater_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.heater_cmd
-        fan_cmd = 0 if inputs.plant_mode == PLANT_MODE_HOLD else inputs.fan_cmd
+        hold = inputs.plant_mode == PLANT_MODE_HOLD
+        heater_cmd = 0 if hold else inputs.heater_cmd
+        fan_cmd = 0 if hold else inputs.fan_cmd
+        flujo_invertido = bool(inputs.flow_dir_cmd) and not hold
+        # Manipulada 2 (5 oct 2026): 0 = CODESYS no la configura -> 100 %.
+        fan_frac = inputs.fan_speed_pct / 100.0 if inputs.fan_speed_pct > 0 else 1.0
 
-        flujo_invertido = bool(inputs.flow_dir_cmd) and inputs.plant_mode != PLANT_MODE_HOLD
-        e = self.secador.paso(heater_cmd, fan_cmd, dt_h, flujo_invertido=flujo_invertido)
+        # Sub-pasos del lecho de <= dt_lecho_h (1 min), igual que la replica.
+        n = max(1, int(round(dt_h / self.params.dt_lecho_h)))
+        h = dt_h / n
+        e_res0 = self.secador.c.energia_resistencia_kwh
+        if self.modo_lazo == "local":
+            # Habilitacion de la resistencia: RUN y ventilador (el
+            # enclavamiento heater AND fan lo aplica paso_plenum).
+            habilitado = (not hold) and bool(fan_cmd)
+            control = self._termostato if habilitado else (lambda _t: 0)
+            for _ in range(n):
+                e = self.secador.paso(0, fan_cmd, h, control=control, dt_ciclo_s=self.params.dt_ciclo_s,
+                                      flujo_invertido=flujo_invertido, fan_frac=fan_frac)
+        else:
+            for _ in range(n):
+                e = self.secador.paso(heater_cmd, fan_cmd, h, flujo_invertido=flujo_invertido, fan_frac=fan_frac)
+
+        p_kw = self.params.secador.potencia_resistencia_kw
+        e_res = self.secador.c.energia_resistencia_kwh - e_res0
+        duty = 100.0 * e_res / (p_kw * dt_h) if dt_h > 0 else 0.0
         return PlantOutputs(
             t_process_c=e.t_process_c,
             rh_ambient_pct=e.rh_ambiente_pct,
@@ -139,22 +218,30 @@ class ModeloSecadoPlant(Plant):
             tiempo_proceso_h=e.t_h,
             rh_process_pct=e.rh_process_pct,
             m_coffee_max_pct=e.m_capa_max_bh_pct,
+            heater_duty_pct=duty,
+            caudal_m3_min=e.caudal_m3_min,
         )
 
 
 if __name__ == "__main__":
-    # Smoke test: 2 h de modelo en pasos de 1 min con todo/nada a 50 C
-    # (equivale a correr el servidor con --factor-aceleracion 60).
+    # Smoke test: emula al servidor (periodo 1 s) con factor 540 y el
+    # todo/nada de CODESYS escribiendo heater_cmd cada ciclo. En modo
+    # 'plc' reproduce la falla del 4 oct 2026 (22 <-> 65 C); en modo
+    # 'local' T_process debe quedarse en ~50 C.
     from modbus_server import PLANT_MODE_RUN
 
-    plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=60.0))
-    heater = 1
-    print("t[h]   T_process[C]  RH_amb[%]  RH_proc[%]  M_coffee[% b.h.]")
-    for i in range(120):
-        out = plant.step(1.0, PlantInputs(heater_cmd=heater, fan_cmd=1, plant_mode=PLANT_MODE_RUN, comm_lost=False))
-        heater = 1 if out.t_process_c < 50.0 else 0
-        if i % 20 == 0:
-            print(f"{out.tiempo_proceso_h:5.2f}  {out.t_process_c:11.2f}  {out.rh_ambient_pct:8.1f}  "
-                  f"{out.rh_process_pct:9.1f}  {out.m_coffee_pct:12.2f}")
-    c = plant.contadores
-    print(f"Energia resistencia {c.energia_resistencia_kwh:.2f} kWh | agua evaporada {c.agua_evaporada_kg:.2f} kg")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    for modo in ("plc", "local"):
+        plant = ModeloSecadoPlant(ParametrosModeloSecadoPlant(factor_aceleracion=540.0, lazo_termico=modo))
+        heater = 1
+        print(f"--- lazo_termico={modo} ---")
+        print("t[h]   T_process[C]  RH_proc[%]  M_coffee[% b.h.]  duty[%]")
+        for i in range(60):
+            out = plant.step(1.0, PlantInputs(heater_cmd=heater, fan_cmd=1, plant_mode=PLANT_MODE_RUN, comm_lost=False))
+            heater = 1 if out.t_process_c < 50.0 else 0   # PLC_PRG actual
+            if i >= 54:
+                print(f"{out.tiempo_proceso_h:5.2f}  {out.t_process_c:11.2f}  {out.rh_process_pct:9.1f}  "
+                      f"{out.m_coffee_pct:12.2f}  {out.heater_duty_pct:9.1f}")
+        c = plant.contadores
+        print(f"Energia resistencia {c.energia_resistencia_kwh:.2f} kWh | agua evaporada {c.agua_evaporada_kg:.2f} kg"
+              f" | horas grano > 50 C: {c.horas_grano_sobre_50c:.2f}")

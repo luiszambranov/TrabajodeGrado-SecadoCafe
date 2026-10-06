@@ -701,3 +701,69 @@ Pendiente, en orden:
    cambiarla en `main()`. Esto es lo que habilita `M_coffee`
    (direcciones 8-9, hoy reservadas y sin implementar) con un valor
    real en vez de un placeholder.
+
+
+---
+
+## 7. Corrección del 4 oct 2026 — lazo térmico local con factor de aceleración
+
+**Síntoma (prueba con el tutor):** con `--plant modelo --factor-aceleracion 540`
+el HMI mostraba `T_process` alternando ~20 °C ↔ ~64 °C en cada ciclo (onda
+cuadrada en la tendencia), `RH_process` 7 % ↔ 68 % y la humedad del café
+bajando con aire a 64 °C la mitad del tiempo.
+
+**Causa:** periodo de muestreo del lazo demasiado grande frente a la
+dinámica del proceso. El plenum tiene τ ≈ 106 s; con factor 540 cada ciclo
+del servidor (1 s real) avanza 540 s de modelo, así que con `heater_cmd`
+fijo el plenum llega al equilibrio (63 °C o T_amb) antes de que CODESYS
+pueda volver a decidir. Regla práctica: T_s ≤ τ/10 (Åström & Wittenmark,
+1997, *Computer-Controlled Systems*, 3.ª ed., Prentice Hall). La física no
+estaba mal; el todo/nada de CODESYS no puede regular un proceso que
+muestrea cada 5 constantes de tiempo.
+
+**Solución (Python, sin cambios obligatorios en CODESYS):**
+
+| `--lazo-termico` | Quién conmuta la resistencia | Cuándo usarlo |
+|---|---|---|
+| `auto` (default) | `plc` si el paso de modelo por ciclo ≤ τ/10 (~10 s), si no `local` | Siempre, salvo que se quiera forzar |
+| `local` | Termostato del ducto en Python, cada 1 s de modelo, setpoint `--setpoint` (50 °C). CODESYS supervisa: RUN/HOLD, `fan_cmd` (enclavamiento), inversión de flujo, parada por humedad, watchdog. `heater_cmd` del PLC solo se registra | Demo/HMI acelerada (factor 60–3600) |
+| `plc` | `heater_cmd` de CODESYS (comportamiento anterior) | Verificación a tiempo real: `--factor-aceleracion 1` |
+
+Con `local` la planta del servidor es la misma que la réplica Monte Carlo
+(`control_supervisado.py`): día nominal, t_obj = 33.2 h / 136.7 kWh en
+ambas (factor 60); 33.3 h con factor 540; 34.0 h con factor 3600 (la
+diferencia es solo la granularidad de la parada, que CODESYS evalúa una
+vez por ciclo). T_process se mantiene en 49.7–50.2 °C.
+
+**Nuevo registro:** `heater_duty` (dir. 18-19, REAL, Python → CODESYS, %):
+fracción del último ciclo con la resistencia encendida. Mismo orden de
+palabras que los demás REAL (`words[0] := lo; words[1] := hi`).
+
+**Cambios recomendados en CODESYS (opcionales, para que el HMI sea coherente):**
+1. Leer `heater_duty_hi/lo` (FC03, dir. 18/19) y mostrarlo en el HMI.
+2. El piloto “Heater” en modo acelerado debe encenderse con
+   `heater_duty > 0.0` en lugar de `heater_cmd = 1`.
+3. En `PLC_PRG`, `heater_cmd` pasa a ser **habilitación** de la resistencia:
+   `heater_cmd := BOOL_TO_WORD((fan_cmd = 1) AND (plant_mode = 0) AND NOT comm_error AND NOT fin_secado);`
+   (en modo `local` Python no lo usa todavía, pero deja el PLC listo para
+   que el termostato local quede condicionado al permiso del PLC).
+
+
+## 8. Caudal variable (manipulada 2) — 5 oct 2026
+
+Nuevos registros (el servidor ahora tiene 24 registros, 0-23):
+
+| Canal | Tipo de acceso | Dirección | Longitud | Variable PLC |
+|---|---|---|---|---|
+| `fan_speed_pct` | Write Single Register (FC06) | 16#0014 (20) | 1 | `PLC_PRG.fan_speed_pct` (WORD, 30-100 %) |
+| `caudal_hi` | Read Holding Registers (FC03) | 16#0016 (22) | 1 | `PLC_PRG.caudal_raw[0]` |
+| `caudal_lo` | Read Holding Registers (FC03) | 16#0017 (23) | 1 | `PLC_PRG.caudal_raw[1]` |
+
+- Si CODESYS no escribe el registro 20 (queda en 0), Python usa 100 %: el
+  proyecto anterior sigue funcionando igual.
+- Valores de 1 a 29 se recortan a 30 % (mínimo de operación).
+- `fan_speed_pct` cuenta como escritura de actuador para el watchdog.
+- Código completo en `codesys/PLC_PRG_v3.st`; incluye además `aire_invertido`
+  (BOOL para la lámpara).
+- HMI: control deslizante o campo numérico sobre `PLC_PRG.fan_speed_pct`
+  (30-100) y un recuadro con `PLC_PRG.caudal_m3_min`.

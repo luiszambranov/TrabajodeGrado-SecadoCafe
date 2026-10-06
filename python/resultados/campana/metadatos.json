@@ -1,0 +1,132 @@
+{
+  "fecha_inicio": "2026-10-05T21:09:37",
+  "comando": "campana_montecarlo.py --n 150 --semilla-inicial 1001 --salida resultados/campana --procesos 4",
+  "git_commit": "a6a633d77026f46e85773b078bda0c190f947e0d",
+  "python": "3.14.7",
+  "numpy": "2.5.2",
+  "scipy": "1.18.1",
+  "sistema": "Windows-11-10.0.26200-SP0",
+  "semillas": [
+    1001,
+    1150
+  ],
+  "n": 150,
+  "horizonte_h": 720.0,
+  "dias_clima_por_realizacion": 40,
+  "aleatorio": {
+    "clima": {
+      "modelo": "AR(1) sobre anomalías diarias (generador_ambiente.secuencia_dias_perturbados)",
+      "sigma_tmin_c": 0.97,
+      "sigma_tmax_c": 1.36,
+      "phi_tmin": 0.49,
+      "phi_tmax": 0.39,
+      "sigma_ea_resid_frac": 0.04,
+      "phi_ea": 0.22,
+      "fuente": "NASA POWER 2005-2024 (4.97 N, 75.65 O), medias de Naranjal (Cenicafé 1998)"
+    },
+    "m0_bh_pct": {
+      "distribucion": "uniforme",
+      "min": 52.0,
+      "max": 56.0,
+      "fuente": "SECAFÉ (Parra-Coronado et al., 2008)"
+    }
+  },
+  "humedad_objetivo_bh_pct": 11.0,
+  "perfiles": [
+    {
+      "codigo": "REF",
+      "nombre": "Cenicafé: 50 °C constante, caudal 100 %",
+      "sp_inicial_c": 50.0,
+      "sp_final_c": 50.0,
+      "caudal_frac": 1.0,
+      "fuente": "González et al. (2010)"
+    },
+    {
+      "codigo": "P1-C30",
+      "nombre": "45 °C constante, caudal 30 %",
+      "sp_inicial_c": 45.0,
+      "sp_final_c": 45.0,
+      "caudal_frac": 0.3,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P1-C75",
+      "nombre": "45 °C constante, caudal 75 %",
+      "sp_inicial_c": 45.0,
+      "sp_final_c": 45.0,
+      "caudal_frac": 0.75,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P1-C100",
+      "nombre": "45 °C constante, caudal 100 %",
+      "sp_inicial_c": 45.0,
+      "sp_final_c": 45.0,
+      "caudal_frac": 1.0,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P2-C30",
+      "nombre": "55 → 35 °C al 30 % b.h., caudal 30 %",
+      "sp_inicial_c": 55.0,
+      "sp_final_c": 35.0,
+      "caudal_frac": 0.3,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P2-C75",
+      "nombre": "55 → 35 °C al 30 % b.h., caudal 75 %",
+      "sp_inicial_c": 55.0,
+      "sp_final_c": 35.0,
+      "caudal_frac": 0.75,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P2-C100",
+      "nombre": "55 → 35 °C al 30 % b.h., caudal 100 %",
+      "sp_inicial_c": 55.0,
+      "sp_final_c": 35.0,
+      "caudal_frac": 1.0,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P3-C30",
+      "nombre": "35 → 55 °C al 30 % b.h., caudal 30 %",
+      "sp_inicial_c": 35.0,
+      "sp_final_c": 55.0,
+      "caudal_frac": 0.3,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P3-C75",
+      "nombre": "35 → 55 °C al 30 % b.h., caudal 75 %",
+      "sp_inicial_c": 35.0,
+      "sp_final_c": 55.0,
+      "caudal_frac": 0.75,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    },
+    {
+      "codigo": "P3-C100",
+      "nombre": "35 → 55 °C al 30 % b.h., caudal 100 %",
+      "sp_inicial_c": 35.0,
+      "sp_final_c": 55.0,
+      "caudal_frac": 1.0,
+      "fuente": "de Oliveira et al. (2018); González et al. (2010)"
+    }
+  ],
+  "humedad_cambio_perfil_bh_pct": 30.0,
+  "estrategias": [
+    "PASIVA",
+    "ACTIVA",
+    "REF",
+    "P1-C30",
+    "P1-C75",
+    "P1-C100",
+    "P2-C30",
+    "P2-C75",
+    "P2-C100",
+    "P3-C30",
+    "P3-C75",
+    "P3-C100"
+  ]
+}

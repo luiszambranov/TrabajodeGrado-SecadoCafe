@@ -2,88 +2,41 @@
 linea_base_activa.py
 =====================
 
-ACTUALIZACION 29 sept 2026 (v0.2): el modelo de esta linea base para la
-campana Monte Carlo es ahora el modelo UNICO de Roa-Cenicafe
-(``cinetica_roa.py``), alimentado con las condiciones de la camara solar
-(ver seccion "v0.2" al final del modulo). El modelo Logaritmico de
-Mackpayen et al. (2017) de abajo (v0.1, semana 5) se conserva por
-trazabilidad y por los notebooks; NO responde a T/HR ni al clima de
-Chinchina, por lo que no sirve para Monte Carlo.
+Linea base ACTIVA: secado solar activo con ventilacion forzada
+(invernadero/tunel solar con ventilador todo/nada por horario, 06:00-18:00;
+ver docs/seleccion_lineas_base.md).
+Trabajo de grado - Sistema de supervision digital para el secado de cafe.
 
---- Docstring original v0.1 ---
+Modelo
+------
+Modelo cinetico UNICO del proyecto, Roa-Cenicafe (``cinetica_roa.py``).
+El aire de la camara es el ambiente de Chinchina (``generador_ambiente.py``)
+calentado por la cubierta solar un incremento diurno de maximo
+``DT_MAX_ACTIVA_C`` = 12.5 C. Ese valor da una reduccion del 47.5 % del
+tiempo frente a la estrategia pasiva, dentro del 30-50 % de
+Duque-Dussan et al. (2026) y del 40-50 % de Meja et al. (2025), y dentro
+del incremento de 10-25 C reportado para secadores solares activos
+(Duque-Dussan et al., 2026). Detalle en el bloque de comentarios de abajo.
 
-Línea base activa: secado solar activo con ventilación forzada (ver
-docs/seleccion_lineas_base.md). Semana 5 - "Modelo base validado".
+Uso principal: ``condiciones_activa(clima_dias)`` (lo llama
+``campana_montecarlo.py``) y ``simular_activa``. ``python
+linea_base_activa.py`` imprime el mapa de calibracion.
 
-Modelo usado: Logarítmico, con los parámetros YA AJUSTADOS y publicados
-por Mackpayen et al. (2017) para un secador solar de convección forzada
-(secador Icaro mejorado) — mismo principio físico que nuestra línea base
-activa (placa absorbedora + ventiladores). Es el modelo con mejor ajuste
-reportado por esos autores entre los cuatro que probaron (R²=0.984).
-Ver data/reference/mackpayen_2017_icaro_dryer.md para el detalle
-completo de la fuente y la verificación de estos parámetros.
+Historial: la v0.1 (semana 5, modelo Logaritmico de Mackpayen et al.,
+2017) no respondia a T/HR ni al clima de Chinchina y se retiro del modulo
+el 6 oct 2026; se conserva en ``python/legacy/lineas_base_v01.py``. Ver
+docs/evolucion_del_modelo.md.
 
-Importante sobre unidades
---------------------------
-El paper de Mackpayen et al. define el tiempo en MINUTOS. Este módulo
-sigue la convención del resto del proyecto (tiempo en HORAS, ver
-modelo_secado.py) y por eso k se reporta ya convertido:
-
-    k [1/h] = k_paper [1/min] * 60 = 0.0031 * 60 = 0.186 1/h
-
-a y c son adimensionales y no cambian con la conversión.
-
-Limitaciones explícitas (v0.1)
---------------------------------
-1. El paper no aclara si M0=70% / Me=12.5% son en base húmeda o base
-   seca. Por eso esta función trabaja en el espacio de MR (adimensional,
-   sin ambigüedad de convención) y NO convierte a humedad absoluta M(t)
-   por defecto; quien la use puede pasar sus propios M0/Me una vez se
-   confirme la convención (con el asesor o con literatura adicional).
-2. Los parámetros fueron ajustados para un secador con placa absorbedora
-   inclinada + cubierta de vidrio que alcanza una temperatura de cámara
-   de equilibrio ≈54°C — más alta que la de un diseño de invernadero/
-   túnel solar simple sin concentración (ver
-   docs/seleccion_lineas_base.md, incrementos de 1-25°C sobre ambiente
-   según Meja et al./Duque-Dussán et al.). Se usa como la mejor
-   aproximación disponible con parámetros reales y verificados para
-   secado solar activo; si el diseño final de la línea base activa del
-   proyecto resulta térmicamente muy distinto (p. ej. sin concentrador),
-   este ajuste debería revisarse con el asesor.
+Referencias: ver docs/seleccion_lineas_base.md (Duque-Dussan et al., 2026;
+Meja et al., 2025; Penuela-Martinez et al., 2025).
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from modelo_secado import ParametrosLogaritmico, mr_logaritmico
-
-# --- Parámetros de Mackpayen et al. (2017), convertidos a 1/h ---
-K_PAPER_POR_MIN = 0.0031
-PARAMETROS_LINEA_ACTIVA = ParametrosLogaritmico(
-    a=1.1274,
-    k=K_PAPER_POR_MIN * 60.0,  # -> 1/h
-    c=-0.1780,
-)
-
-# Condiciones del experimento fuente (para referencia/trazabilidad)
-T_CAMARA_EQUILIBRIO_C = 54.0   # rango reportado: 50-60 C
-VELOCIDAD_AIRE_MS = 1.5
-TIEMPO_MAXIMO_AJUSTE_H = 500.0 / 60.0  # ~8.3 h (0-500 min en el paper)
-
-
-def mr_linea_base_activa(t: np.ndarray) -> np.ndarray:
-    """Razón de humedad MR(t) de la línea base activa (modelo Logarítmico,
-    parámetros de Mackpayen et al. 2017, t en horas).
-
-    Válido con confianza hasta ~8.3 h (rango del ajuste original); fuera
-    de ese rango es extrapolación.
-    """
-    return mr_logaritmico(np.asarray(t, dtype=float), PARAMETROS_LINEA_ACTIVA)
-
-
 # ===========================================================================
-# v0.2 (29 sept 2026) - Secador solar activo con el modelo unico de Roa
+# Secador solar activo con el modelo unico de Roa (desde el 29 sept 2026)
 # ===========================================================================
 #
 # Condiciones que recibe el cafe en la camara solar activa:
@@ -100,28 +53,27 @@ def mr_linea_base_activa(t: np.ndarray) -> np.ndarray:
 #   - El vapor que libera el cafe no se suma al aire (misma simplificacion
 #     ya declarada en dinamica_termica.py).
 #
-# Calibracion de DT_MAX_ACTIVA_C
-# --------------------------------
+# Calibracion de DT_MAX_ACTIVA_C (ACTUALIZADO 4 oct 2026)
+# --------------------------------------------------------
 # docs/seleccion_lineas_base.md cita una reduccion del tiempo de secado
-# frente a patio de 30-50 % (Duque-Dussan et al., 2026) y de 40-50 % para
-# invernadero activo con ventilacion forzada (Meja et al., 2025), y un
-# incremento de temperatura interna de 10-25 C para secadores solares
-# activos (Duque-Dussan et al., 2026).
+# frente al secado solar pasivo de 30-50 % (Duque-Dussan et al., 2026) y de
+# 40-50 % para invernadero activo con ventilacion forzada (Meja et al.,
+# 2025), y un incremento de temperatura interna de 10-25 C para secadores
+# solares activos (Duque-Dussan et al., 2026).
 #
-# Como el secado solar solo avanza de dia, el tiempo hasta 11 % b.h. cambia
-# A SALTOS (el cafe termina en la tarde del dia N o del dia N+1). En el dia
-# nominal de Chinchina (tiempo de patio = 130.9 h) el mapa es:
+# La linea base pasiva se recalibro el 4 oct 2026 contra Cenicafe (10.6 d,
+# ver escenario_sol_abierto.py) y el ciclo diario ahora es asimetrico
+# (Guzman & Ramirez, 2004). Mapa en el dia nominal (pasiva = 255.8 h):
 #
-#     DT_MAX [C]   15     17     18-22.5        22.8-25       30
-#     reduccion    17 %   19 %   34-38 %        50-53 %       56 %
+#     DT_MAX [C]   8.0-9.0     9.5-11.0     11.5-14.0     14.5-16
+#     reduccion    28-30 %     37-39 %      45-49 %       55-57 %
 #
-# No existe un DT_MAX que de exactamente 40 %: hay un escalon entre 38 % y
-# 50 %. Se elige DT_MAX = 20 C, el CENTRO de la meseta 18-22.5 C:
-#   - reduccion 36 % frente a patio, dentro del rango 30-50 % de
-#     Duque-Dussan et al. (2026) (en el borde inferior del 40-50 % de
-#     Meja et al., 2025);
+# Se elige DT_MAX = 12.5 C, dentro de la meseta 11.5-14.0 C:
+#   - reduccion 47.5 % (134.3 h = 5.6 d): cumple A LA VEZ el 30-50 % de
+#     Duque-Dussan et al. (2026) y el 40-50 % de Meja et al. (2025);
 #   - incremento dentro del rango 10-25 C de Duque-Dussan et al. (2026);
-#   - estable: +-2 C no cambia el dia de terminacion en el dia nominal.
+#   - estable: +-1 C no cambia el dia de terminacion.
+# Igual que en la pasiva, es un parametro efectivo (incluye dias nublados).
 # Reproducible con mapa_calibracion_activa().
 #
 # Implicacion para Monte Carlo: por este efecto de escalon, el tiempo a
@@ -133,20 +85,21 @@ def mr_linea_base_activa(t: np.ndarray) -> np.ndarray:
 # ----------------------------------------------------------------------
 # Las tres estrategias secan el MISMO lote: 80 kg de cafe pergamino seco
 # (158 kg humedos a 55 % b.h.). En secado solar el cafe se extiende en
-# CAPA DELGADA de ~2 cm (capacidad estandar de los secadores solares de
-# Cenicafe; Guerrero-Aguirre et al., 2025, Avances Tecnicos Cenicafe), de
-# modo que cada grano recibe practicamente el aire/sol del ambiente y la
-# ecuacion de capa delgada de Roa se aplica directamente, sin el modelo
-# por capas que exige el lecho de 20 cm del secador electrico. Area
-# necesaria: 158 kg / 696 kg/m3 (densidad aparente, Montoya 1989) / 0.02 m
-# = ~12.8 m2, frente a 1.28 m2 del secador electrico (dato para CAPEX).
-AREA_CAPA_DELGADA_M2 = 12.8
+# CAPA DELGADA de 2 cm (capacidad de diseno de los secadores solares de
+# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Penuela-Martinez et al.,
+# 2025, Avances Tecnicos Cenicafe), de modo que cada grano recibe
+# practicamente el aire/sol del ambiente y la ecuacion de capa delgada de
+# Roa se aplica directamente, sin el modelo por capas que exige el lecho de
+# 20 cm del secador electrico. Area necesaria: 80 / 7.2 = 11.1 m2 (antes
+# 12.8 m2 por densidad aparente), frente a 1.28 m2 del secador electrico
+# (dato para CAPEX).
+AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Penuela-Martinez et al., 2025)
 ESPESOR_CAPA_DELGADA_M = 0.02
 
 import generador_ambiente as _amb
 import cinetica_roa as _roa
 
-DT_MAX_ACTIVA_C = 20.0     # C, centro de la meseta 18-22.5 C (ver bloque de arriba)
+DT_MAX_ACTIVA_C = 12.5     # C, meseta 11.5-14.0 C (ver bloque de arriba, 4 oct 2026)
 
 
 def condiciones_activa(clima_dias, dt_max_c: float = DT_MAX_ACTIVA_C):
@@ -165,7 +118,7 @@ def simular_activa(clima_dias, dt_h: float = 0.25, t_max_h: float = 1500.0, **kw
     return _roa.simular(condiciones_activa(clima_dias), dt_h=dt_h, t_max_h=t_max_h, **kw)
 
 
-def mapa_calibracion_activa(valores=(15.0, 17.0, 18.0, 20.0, 22.5, 22.8, 25.0, 30.0)):
+def mapa_calibracion_activa(valores=(8.0, 9.0, 9.5, 11.0, 11.5, 12.5, 14.0, 14.5, 16.0)):
     """Reduccion del tiempo a humedad objetivo frente a patio (dia nominal
     de Chinchina) para varios DT_MAX (ver bloque de calibracion)."""
     from escenario_sol_abierto import simular_patio
@@ -180,7 +133,6 @@ def mapa_calibracion_activa(valores=(15.0, 17.0, 18.0, 20.0, 22.5, 22.8, 25.0, 3
 
 
 if __name__ == "__main__":
-    print("=== v0.2 (Roa) ===")
     t_patio, filas = mapa_calibracion_activa()
     print(f"Tiempo patio (dia nominal): {t_patio:.1f} h")
     for dt_max, t, red in filas:
@@ -191,11 +143,3 @@ if __name__ == "__main__":
         f"{r.t_objetivo_h:.1f} h ({r.t_objetivo_h / 24:.1f} d); T camara max {r.t_c.max():.1f} C; "
         f"rehumectacion {r.horas_rehumectacion:.1f} h; fuera de rango {r.horas_fuera_de_rango:.1f} h\n"
     )
-    print("=== v0.1 (Logaritmico Mackpayen, legado) ===")
-    t = np.linspace(0, TIEMPO_MAXIMO_AJUSTE_H, 20)
-    mr = mr_linea_base_activa(t)
-    print(f"Parametros (convertidos a 1/h): {PARAMETROS_LINEA_ACTIVA}")
-    print(f"Rango valido del ajuste original: 0 - {TIEMPO_MAXIMO_AJUSTE_H:.2f} h\n")
-    for ti, mri in zip(t[::3], mr[::3]):
-        print(f"  t={ti:5.2f} h   MR={mri:.4f}")
-    print(f"\nMR final esperado (~12.5% de la humedad inicial, ver fuente): {mr[-1]:.4f}")

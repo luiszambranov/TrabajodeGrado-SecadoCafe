@@ -1,5 +1,7 @@
 # Mackpayen et al. (2017) — secador solar Icaro mejorado (línea base activa)
 
+> **Uso actual (6 oct 2026):** histórico. El modelo Logarítmico descrito abajo fue la línea base activa v0.1, retirada el 29 sept 2026 (`python/legacy/lineas_base_v01.py`); la activa usa hoy el modelo de Roa–Cenicafé.
+
 Fuente:
 
 > Mackpayen, A. O., M'Boliguipa, J., Malenguinza, S., Bara, L. M., & Napo,
@@ -40,7 +42,7 @@ convertir MR a M(t) en unidades absolutas (ver nota en
 `python/linea_base_activa.py`).
 
 **Conversión de unidades usada en el proyecto** (el resto del código
-usa horas, no minutos, ver `python/modelo_secado.py`):
+usa horas, no minutos, ver `python/legacy/modelo_secado.py`):
 
 ```
 k [1/h] = k [1/min] * 60 = 0.0031 * 60 = 0.186 1/h

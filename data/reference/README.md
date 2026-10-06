@@ -1,8 +1,31 @@
 # /data/reference
 
-Datos y parámetros digitalizados de la literatura, usados para validar el
-modelo Python del proyecto. Distinguir siempre esto de `/data/simulations`
-(datasets generados por nuestras propias campañas de simulación).
+Datos y parámetros tomados de la literatura, con la justificación de cada
+valor del modelo. Distinguir siempre de `python/resultados/` (datos
+generados por nuestras simulaciones).
+
+## Vigentes (los usa el modelo actual)
+
+| Archivo | Para qué |
+|---|---|
+| `roa_cenicafe_isoterma_capa_delgada.md` | Isoterma de Roa (Trejos et al., 1989) y ecuación de capa delgada de SECAFÉ: el modelo cinético único. Erratas detectadas y verificación cruzada. |
+| `secador_electrico_dimensionamiento.md` | Dimensionamiento del secador supervisado (lote, caudal, lecho, resistencia, plenum) con fuentes. |
+| `equipos_energia.md` | Equipos comerciales (ventilador S&P, resistencias Tempco, extractor de la activa) y su consumo. Insumo del objetivo 4. |
+| `chinchina_clima_fuentes.md` | Clima de Chinchiná: medias de Naranjal, horas de T mín/máx, variabilidad con NASA POWER. |
+| `validacion_modelo.md` | Validación contra 4 casos independientes (laboratorio, patio, secador Escafé, secado solar). |
+| `phitakwinai_2019_tabla2_parametros.csv` | Tabla 2 de Phitakwinai et al. (2019). La usa `python/validacion_modelo.py` (caso V1). |
+| `eliseu_2008_secado_patio.md` | Secado en patio en Brasil. Hoy solo validación independiente (caso V2). |
+
+## Históricos (modelos retirados, ver `docs/evolucion_del_modelo.md`)
+
+| Archivo | Para qué se usó |
+|---|---|
+| `phitakwinai_2019_tabla3_ecuaciones_generalizadas.md` | Midilli generalizado de la planta del 23 sept 2026 (`python/legacy/cinetica_dinamica.py`). |
+| `mackpayen_2017_icaro_dryer.md` | Línea base activa v0.1 (modelo Logarítmico, `python/legacy/lineas_base_v01.py`). |
+
+---
+
+Detalle histórico de la Tabla 2 y 3 de Phitakwinai et al. (2019):
 
 ## phitakwinai_2019_tabla2_parametros.csv
 
@@ -23,7 +46,7 @@ cada ajuste reportados por los propios autores.
 regresión publicados directamente en la tabla del paper, por lo que son
 exactos (no aproximados por digitalización visual).
 
-Convenciones del paper (importante, distintas de `python/modelo_secado.py`):
+Convenciones del paper (importante, distintas de `python/legacy/modelo_secado.py`):
 
 - Humedad en **base seca** (% d.b.), no base húmeda. `M0 = 122 % d.b.`
   (común a todas las corridas); `Me` final entre 4.5 % y 12.5 % d.b.
@@ -50,9 +73,9 @@ discretas de la Tabla 2. Es un insumo directo para el generador de
 perturbaciones ambientales (T/HR ambiente nominal y perturbado) pendiente
 en la semana 5.
 
-## Uso en el ajuste (semana 5)
+## Uso en el ajuste (semana 5, histórico)
 
-`python/ajuste_modelos.py` usa la fila `Modified_Midilli, T=60, RH=20`
+`python/legacy/ajuste_modelos.py` usa la fila `Modified_Midilli, T=60, RH=20`
 (mejor r² individual: 0.9997, RMSE = 2.323 %) para generar una curva de
 referencia MR(t) con la ecuación *ya publicada y validada* por los
 autores, y ajusta contra ella nuestros tres modelos candidatos (Newton,

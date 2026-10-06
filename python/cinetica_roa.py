@@ -11,7 +11,7 @@ Por que este modelo (decision del 29 sept 2026)
 -------------------------------------------------
 El informe de prioridades del asesor (25 sept 2026) pide cerrar el dominio
 T-HR del modelo antes del Monte Carlo. Phitakwinai et al. (2019), usado en
-cinetica_dinamica.py, solo es valido en 50-70 C / 10-30 % HR, mientras las
+legacy/cinetica_dinamica.py, solo es valido en 50-70 C / 10-30 % HR, mientras las
 tres estrategias recorren aprox. 15-65 C / 5-100 % HR (ambiente de
 Chinchina, secado en patio, solar activo, calentamiento y enfriamiento de
 la propuesta supervisada). El modelo de Roa-Cenicafe:
@@ -63,7 +63,7 @@ Ecuaciones
 
 Integracion bajo condiciones variables (tiempo equivalente, Thompson)
 -----------------------------------------------------------------------
-Mismo criterio cuasi-estacionario que cinetica_dinamica.py y que el modelo
+Mismo criterio cuasi-estacionario que legacy/cinetica_dinamica.py y que el modelo
 de Thompson usado en SECAFE: en cada paso, con las condiciones ACTUALES
 (T, HR) se calculan Me y k, se busca el tiempo equivalente
 
@@ -88,7 +88,7 @@ Convencion de unidades
 -----------------------
     Internamente: M, Me en % base SECA (como las fuentes).
     Interfaz: funciones de conversion a/desde % base humeda, que es la
-    convencion de reporte del proyecto (modelo_secado.py).
+    convencion de reporte del proyecto (legacy/modelo_secado.py).
     T en C, HR en % (0-100), t en h.
 
 Referencias

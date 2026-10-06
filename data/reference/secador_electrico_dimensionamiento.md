@@ -17,7 +17,7 @@ Control de caudal y temperatura de aire en el secado mecánico de café.
 | Caudal específico óptimo, lecho estático | **0.1 m³/min por kg c.p.s.** | 80 kg → 8.0 m³/min |
 | Espesores evaluados | 20, 30, 40, 54 cm (menor espesor = mayor ahorro) | Lecho de **20 cm** |
 | Ventilador del secador experimental | 4.95 kW para 2 000 kg c.p.s. (2.475 W/kg) | 80 kg → **0.20 kW** (escalado lineal, mismo caudal específico y espesor) |
-| Resultado experimental | ~49 h promedio, 53 % → 10–12 % b.h. (lotes de ~1 500 kg, 20–54 cm) | Referencia de validación |
+| Resultado experimental | ~49 h promedio, pero para **café semilla a 38 °C** (no café comercial a 50 °C) | **No sirve como validación** del secador a 50 °C (corrección del 4 oct 2026; ver sección 3) |
 
 ## 2. Potencia de la resistencia
 
@@ -81,7 +81,8 @@ Resultados con aire a 50 °C constante, día nominal de Chinchiná:
 |---|---|
 | Capa delgada pura (sin límite del aire) | 20.7 h |
 | **Lecho de 20 cm, 8 capas (Thompson), sin inversión, parada por promedio** | **32.5 h** |
-| Cenicafé, lechos de 20–54 cm y ~1 500 kg (promedio) | ~49 h |
+| Cenicafé, secador de 3 pisos a 50 °C, capas de 0.1–0.3 m, inversión cada 6–12 h (Roa et al., 2000) | 20–24 h, hasta 11–16 % b.h. |
+| Cenicafé, silos de capa estática a 50 ± 3 °C, 100 m³/min/t, 53 % → 10–12 % b.h. (Oliveros et al., 2010) | ~18 h |
 
 Convergencia numérica: con capas de 1.25 cm o subpasos de 1.2–6 min el
 resultado cambia ≤ 0.25 h.
@@ -144,3 +145,33 @@ llegar a 50 °C. Es despreciable frente a las ~33 h de secado. UA es el 2 % de
 - Thompson, T. L., Peart, R. M., & Foster, G. H. (1968). Mathematical
   simulation of corn drying: a new model. *Transactions of the ASAE, 11*(4),
   582–586.
+
+
+## 6. Validación contra Cenicafé (corrección del 4 oct 2026)
+
+El "~49 h" que se usaba antes como referencia de González et al. (2010)
+corresponde a **café semilla secado a 38 °C**, así que no sirve para validar
+el secador a 50 °C. Las referencias correctas para café comercial a 50 °C son:
+
+| Fuente | Configuración | Tiempo |
+|---|---|---|
+| Roa-Mejía, G., Oliveros-Tascón, C. E., Parra-Coronado, A., & Ramírez-G., C. A. (2000). *El secado mecánico del café*. Avances Técnicos Cenicafé 282 | Secador de 3 pisos, 50 °C, capas 0.1–0.3 m, inversión cada 6–12 h | 20–24 h hasta 11–16 % b.h. |
+| Oliveros-Tascón, C. E., Sanz-Uribe, J. R., Ramírez-Gómez, C. A., & Peñuela-Martínez, A. E. (2009). *Aprovechamiento eficiente de la energía en el secado mecánico del café*. Avances Técnicos Cenicafé 380 | Secador de capa fija, 48–52 °C, 98–102 m³/min/t | hasta 24 h |
+| Oliveros-Tascón, C. E., et al. (2010). Determinación del contenido de humedad del café durante el secado en silos. *Cenicafé, 61*(2), 108–118 | Silos de 56 y 94 kg c.p.s., capas 10–40 cm, 50 ± 3 °C, 100 m³/min/t, 53 % → 10–12 % b.h. | ~18 h |
+| **Este modelo** | Capa única de 20 cm, 80 kg, 50 °C, 0.1 m³/min/kg, inversión cada 6 h | **33.1 h** hasta 11 % (≈30 h hasta 13.5 %) |
+
+**Lectura:** el modelo es **entre 35 y 80 % más lento** que el rango de
+Cenicafé (18–24 h). Es un error de validación que se reporta tal cual en el
+documento. Causas probables, por revisar:
+1. Los secadores de Cenicafé de varios pisos reutilizan el aire de salida
+   para presecar las capas superiores; el nuestro es de una sola capa.
+2. La ecuación de capa delgada de Roa se obtuvo con aire de baja velocidad;
+   el lecho de Thompson hace que las capas superiores reciban aire casi
+   saturado.
+3. El caudal de "100 m³/min/t" de Cenicafé puede referirse a la capacidad
+   total del silo (todos los pisos), no a cada capa.
+
+Opción si el asesor pide cerrar la brecha: calibrar el coeficiente `m` de
+la ecuación de Roa (o la eficiencia del lecho) para que el modelo dé
+~24 h en las condiciones de Oliveros et al. (2010), y reportar el valor
+calibrado junto con el original.

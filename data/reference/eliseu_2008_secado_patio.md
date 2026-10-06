@@ -1,5 +1,7 @@
 # Secado en patio (línea base mínima) — condiciones de referencia
 
+> **Uso actual (6 oct 2026):** ya no calibra ningún modelo. Es el caso V2 de la validación independiente (`validacion_modelo.md`). El modelo Newton descrito abajo está retirado (`python/legacy/lineas_base_v01.py`).
+
 Fuente:
 
 > Estudio de cinética de secado de clones de café (*Coffea canephora*

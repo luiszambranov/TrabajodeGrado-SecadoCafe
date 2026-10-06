@@ -2,80 +2,53 @@
 escenario_sol_abierto.py
 ==========================
 
-ACTUALIZACION 29 sept 2026 (v0.2): el modelo de esta linea base para la
-campana Monte Carlo es ahora el modelo UNICO de Roa-Cenicafe
-(``cinetica_roa.py``), el mismo de las otras dos estrategias, alimentado
-con las condiciones del patio (ver seccion "v0.2" al final del modulo).
-El modelo Newton de abajo (v0.1, semana 5) se conserva solo por
-trazabilidad y porque lo usan los notebooks de la semana 5; NO responde
-a T/HR, por lo que no sirve para Monte Carlo.
+Linea base minima (estrategia PASIVA): secado tradicional al sol en patio,
+lazo abierto, sin control del perfil termico (ver
+docs/seleccion_lineas_base.md).
+Trabajo de grado - Sistema de supervision digital para el secado de cafe.
 
---- Docstring original v0.1 ---
+Modelo
+------
+Modelo cinetico UNICO del proyecto, Roa-Cenicafe (``cinetica_roa.py``),
+el mismo de las otras dos estrategias; solo cambian las condiciones de
+aire que recibe el cafe. El patio recibe el ambiente de Chinchina
+(``generador_ambiente.py``) mas un incremento solar diurno sobre la
+temperatura del grano, de maximo ``DT_MAX_PATIO_C`` = 4.4 C, calibrado
+contra los 10.6 dias de secado solar de Cenicafe (Penuela-Martinez et
+al., 2025). Detalle de la calibracion en el bloque de comentarios de
+abajo.
 
-Línea base mínima: secado tradicional al sol en patio, lazo abierto, sin
-control activo del perfil térmico (ver docs/seleccion_lineas_base.md).
-Semana 5 - "Modelo base validado".
+Uso principal: ``condiciones_patio(clima_dias)`` (lo llama
+``campana_montecarlo.py``) y ``simular_patio``. ``python
+escenario_sol_abierto.py`` imprime el mapa de calibracion.
 
-Modelo usado: Newton (`MR = exp(-k*t)`), el modelo mínimo de referencia
-del proyecto (ver docs/matriz_comparativa_modelos.md: "modelo más
-simple, útil como referencia mínima"), apropiado para un proceso sin
-control activo.
+Historial: la v0.1 (semana 5, modelo de Newton calibrado con Eliseu,
+2008) no respondia a T/HR y se retiro del modulo el 6 oct 2026; se
+conserva en ``python/legacy/lineas_base_v01.py``. Ver
+docs/evolucion_del_modelo.md.
 
-Calibración de k
-------------------
-NO se usan coeficientes de un ajuste completo (no se consiguió
-verificar la tabla de parámetros del paper de referencia, ver
-data/reference/eliseu_2008_secado_patio.md). En su lugar se calibra k
-con las condiciones generales reportadas para secado en patio de café
-(T=26.3°C, RH=63.3%, tiempo total=117.5 h), asumiendo que ese tiempo
-total corresponde al punto en que MR≈0.05 ("prácticamente seco", una
-convención común en la literatura de cinética de secado):
-
-    k = -ln(0.05) / 117.5 h = 0.0255 1/h
-
-Esto es una calibración de 2 puntos a un resumen de literatura, no un
-reajuste de datos punto a punto. Ver el .md de referencia para el
-detalle completo y la limitación explícita.
-
-Diferencia esperada frente a las otras dos estrategias
----------------------------------------------------------
-Esta línea base mínima seca en el orden de días (k pequeño), mientras la
-línea base activa (`linea_base_activa.py`) y la propuesta supervisada
-secan en el orden de horas. Esta diferencia de orden de magnitud es una
-primera validación de sentido común de los tres modelos.
+Referencias
+-----------
+- Penuela-Martinez, A. E., Osorio Giraldo, C. V., Guerrero, A., &
+  Sanz-Uribe, J. R. (2025). Manejo del cafe en el secado solar. Avances
+  Tecnicos Cenicafe. https://doi.org/10.38141/10779/0577
+- Eliseu (2008): solo comparacion de legado, ver
+  data/reference/eliseu_2008_secado_patio.md.
 """
 
 from __future__ import annotations
 
-import math
 
 import numpy as np
 
-from modelo_secado import ParametrosNewton, mr_newton
-
-# --- Condiciones de referencia (secado en patio, ver .md de referencia) ---
+# Condiciones de Eliseu (2008, patio en Brasil). Solo para la comparacion
+# de legado calibrar_dt_max_patio_eliseu(); el modelo usa Cenicafe 2025.
 T_AMBIENTE_MEDIA_C = 26.3
 HR_AMBIENTE_MEDIA_PCT = 63.3
 TIEMPO_TOTAL_SECADO_H = 117.5  # ~4.9 dias
-MR_PRACTICAMENTE_SECO = 0.05   # convencion asumida (ver docstring)
-
-K_SOL_ABIERTO = -math.log(MR_PRACTICAMENTE_SECO) / TIEMPO_TOTAL_SECADO_H  # 1/h
-
-PARAMETROS_SOL_ABIERTO = ParametrosNewton(k=K_SOL_ABIERTO)
-
-
-def mr_sol_abierto(t: np.ndarray) -> np.ndarray:
-    """Razón de humedad MR(t) de la línea base mínima (Newton, k calibrado).
-
-    Válido como aproximación hasta ~117.5 h (tiempo total reportado en la
-    fuente); más allá, MR sigue decayendo asintóticamente hacia 0 sin un
-    límite físico explícito en este modelo simplificado.
-    """
-    return mr_newton(np.asarray(t, dtype=float), PARAMETROS_SOL_ABIERTO)
-
 
 # ===========================================================================
-# v0.2 (29 sept 2026) - Patio con el modelo unico de Roa-Cenicafe
+# Patio con el modelo unico de Roa-Cenicafe (desde el 29 sept 2026)
 # ===========================================================================
 #
 # Condiciones que recibe el cafe en patio:
@@ -95,35 +68,57 @@ def mr_sol_abierto(t: np.ndarray) -> np.ndarray:
 #
 # Calibracion de DT_MAX_PATIO_C (unico parametro libre de la estrategia)
 # ------------------------------------------------------------------------
-# Contra el estudio de patio ya usado en v0.1 (Eliseu, 2008; ver
-# data/reference/eliseu_2008_secado_patio.md): T media 26.3 C, HR media
-# 63.3 %, humedad 1.355 -> 0.10 b.s. (promedio de clones), 117.5 h. Se
-# construye un dia tipo con T media 26.3 C, la misma oscilacion diaria que
-# Naranjal (+-5.2 C) y ea = 0.633*es(26.3 C), y se busca (brentq) el
-# DT_MAX que reproduce 117.5 h con el modelo de Roa. Resultado: 12.9 C.
-# Limitaciones: Eliseu es C. canephora en Brasil (clima distinto); la
-# calibracion traslada solo el efecto concentrado del sol sobre el grano,
-# no los parametros cineticos (esos son de Roa, cafe Caturra colombiano).
-# Reproducible con calibrar_dt_max_patio().
+# ACTUALIZADO 4 oct 2026: se calibra con datos COLOMBIANOS de Cenicafe en
+# lugar de Eliseu (2008, C. canephora en Brasil).
+#
+# Fuente: Penuela-Martinez, A. E., Osorio Giraldo, C. V., Guerrero, A., &
+# Sanz-Uribe, J. R. (2025). Manejo del cafe en el secado solar. Avances
+# Tecnicos Cenicafe. https://doi.org/10.38141/10779/0577
+#   - Capacidad de diseno: 7.2 kg c.p.s. por m2, capa de 2.0 cm.
+#   - Humedad final 10-12 % b.h. (se usa 11 %).
+#   - Tiempo de secado solar con 1 400-1 800 h/ano de brillo solar:
+#     10.6 dias en promedio (minimo 6.2, maximo 19.1).
+# Brillo solar de la estacion Naranjal: 1 817 h/ano (Cenicafe 49(4), 1998),
+# es decir el grupo de 1 400-1 800 h (en su borde superior).
+#
+# Se busca el DT_MAX con el que el dia nominal de Chinchina (con el ciclo
+# asimetrico de generador_ambiente) da ~10.6 dias de 55 a 11 % b.h. Como el
+# secado solar solo avanza de dia, el tiempo cambia A SALTOS; hay una
+# meseta DT_MAX = 4.0-4.8 C que termina en el dia 10.6-10.8. Se elige el
+# CENTRO, 4.4 C (255.8 h = 10.66 d). Reproducible con
+# mapa_calibracion_patio().
+#
+# Interpretacion: DT_MAX es un parametro EFECTIVO. El dia nominal tiene sol
+# todos los dias (medio seno de 06:00 a 18:00), pero en Naranjal el brillo
+# solar real es solo el 41 % del maximo teorico (Cenicafe, 1998) y hay
+# dias de lluvia. El promedio de Cenicafe ya incluye esos dias, asi que el
+# DT_MAX calibrado (4.4 C) es menor que el calentamiento en un dia
+# despejado. Esto se declara como limitacion.
+#
+# Legado: la calibracion contra Eliseu (2008) daba 12.9 C con el ciclo
+# simetrico anterior; se conserva calibrar_dt_max_patio_eliseu() solo como
+# comparacion.
 
 # Configuracion fisica (29 sept 2026, lote comun de 80 kg c.p.s.)
 # ----------------------------------------------------------------------
 # Las tres estrategias secan el MISMO lote: 80 kg de cafe pergamino seco
 # (158 kg humedos a 55 % b.h.). En secado solar el cafe se extiende en
-# CAPA DELGADA de ~2 cm (capacidad estandar de los secadores solares de
-# Cenicafe; Guerrero-Aguirre et al., 2025, Avances Tecnicos Cenicafe), de
-# modo que cada grano recibe practicamente el aire/sol del ambiente y la
-# ecuacion de capa delgada de Roa se aplica directamente, sin el modelo
-# por capas que exige el lecho de 20 cm del secador electrico. Area
-# necesaria: 158 kg / 696 kg/m3 (densidad aparente, Montoya 1989) / 0.02 m
-# = ~12.8 m2, frente a 1.28 m2 del secador electrico (dato para CAPEX).
-AREA_CAPA_DELGADA_M2 = 12.8
-ESPESOR_CAPA_DELGADA_M = 0.02
+# CAPA DELGADA de 2 cm (capacidad de diseno de los secadores solares de
+# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Penuela-Martinez et al.,
+# 2025, Avances Tecnicos Cenicafe), de modo que cada grano recibe
+# practicamente el aire/sol del ambiente y la ecuacion de capa delgada de
+# Roa se aplica directamente, sin el modelo por capas que exige el lecho de
+# 20 cm del secador electrico. Area necesaria: 80 / 7.2 = 11.1 m2 (antes
+# 12.8 m2 por densidad aparente), frente a 1.28 m2 del secador electrico
+# (dato para CAPEX).
+AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Penuela-Martinez et al., 2025)
+ESPESOR_CAPA_DELGADA_M = 0.02       # 2.0 cm (misma fuente)
 
 import generador_ambiente as _amb
 import cinetica_roa as _roa
 
-DT_MAX_PATIO_C = 12.9  # C, calibrado (ver bloque de arriba)
+DT_MAX_PATIO_C = 4.4   # C, calibrado contra Cenicafe 2025 (ver bloque de arriba)
+TIEMPO_CENICAFE_SOLAR_H = 10.6 * 24.0  # 254.4 h (Penuela-Martinez et al., 2025)
 ELISEU_T_MEDIA_C = T_AMBIENTE_MEDIA_C
 ELISEU_HR_MEDIA_PCT = HR_AMBIENTE_MEDIA_PCT
 ELISEU_M0_BS_PCT = 135.5   # promedio de 1.20-1.51 b.s.
@@ -148,8 +143,16 @@ def simular_patio(clima_dias, dt_h: float = 0.25, t_max_h: float = 1500.0, **kw)
     return _roa.simular(condiciones_patio(clima_dias), dt_h=dt_h, t_max_h=t_max_h, **kw)
 
 
-def calibrar_dt_max_patio() -> float:
-    """Recalcula DT_MAX_PATIO_C contra Eliseu (2008). Ver bloque de arriba."""
+def mapa_calibracion_patio(valores=None):
+    """Tiempo a 11 % b.h. (dia nominal de Chinchina) para varios DT_MAX.
+    Devuelve [(dt_max, t_h)]; la meseta que contiene 10.6 d define DT_MAX."""
+    nominal = [_amb.condiciones_nominales()]
+    valores = np.arange(3.6, 5.01, 0.1) if valores is None else valores
+    return [(float(d), _roa.simular(condiciones_patio(nominal, d), t_max_h=1500.0).t_objetivo_h) for d in valores]
+
+
+def calibrar_dt_max_patio_eliseu() -> float:
+    """LEGADO: DT_MAX contra Eliseu (2008, Brasil). Solo comparacion."""
     from scipy.optimize import brentq
 
     dia = _amb.CondicionesClimaticas(
@@ -166,18 +169,13 @@ def calibrar_dt_max_patio() -> float:
 
 
 if __name__ == "__main__":
-    print("=== v0.2 (Roa) ===")
-    print(f"DT_MAX_PATIO_C recalibrado: {calibrar_dt_max_patio():.2f} C (constante: {DT_MAX_PATIO_C})")
+    print(f"Calibracion contra Cenicafe 2025 (objetivo {TIEMPO_CENICAFE_SOLAR_H:.1f} h = 10.6 d):")
+    for d, t in mapa_calibracion_patio():
+        print(f"  DT_MAX={d:4.1f} C -> {t:6.1f} h ({t / 24:5.2f} d)")
+    print(f"DT_MAX_PATIO_C usado: {DT_MAX_PATIO_C} C | area {AREA_CAPA_DELGADA_M2:.1f} m2")
     r = simular_patio([_amb.condiciones_nominales()])
     print(
         f"Chinchina (dia nominal): {_roa.M0_BH_PCT} -> {_roa.HUMEDAD_OBJETIVO_BH_PCT} % b.h. en "
         f"{r.t_objetivo_h:.1f} h ({r.t_objetivo_h / 24:.1f} d); rehumectacion {r.horas_rehumectacion:.1f} h; "
         f"fuera de rango {r.horas_fuera_de_rango:.1f} h\n"
     )
-    print("=== v0.1 (Newton, legado) ===")
-    print(f"k calibrado: {K_SOL_ABIERTO:.5f} 1/h "
-          f"(secado total asumido en {TIEMPO_TOTAL_SECADO_H} h)")
-    t = np.linspace(0, TIEMPO_TOTAL_SECADO_H, 10)
-    for ti, mri in zip(t, mr_sol_abierto(t)):
-        dias = ti / 24
-        print(f"  t={ti:6.1f} h ({dias:4.1f} d)   MR={mri:.4f}")

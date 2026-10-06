@@ -146,7 +146,16 @@ class ParametrosSecador:
     potencia_ventilador_kw: float = 0.20
     """Potencia específica del ventilador del secador de González et al.
     (2010): 4.95 kW para 2 000 kg c.p.s. = 2.475 W/kg -> 80 kg ~ 0.20 kW.
-    Escalado lineal con la masa (mismo caudal específico y espesor)."""
+    Escalado lineal con la masa (mismo caudal específico y espesor).
+    Equipo comercial (4 oct 2026): Soler & Palau CBM/6-180/180-N-72W,
+    ~118 Pa a 480 m3/h según la curva del fabricante; 220 V x 1.0 A x FP 0.9
+    = 0.20 kW de consumo máximo. Ver data/reference/equipos_energia.md."""
+
+    caudal_min_frac: float = 0.30
+    """Caudal mínimo del ventilador como fracción del nominal (manipulada 2,
+    5 oct 2026). Por debajo de ~30 % un ventilador centrífugo con regulador
+    de tensión pierde par y el calentador de ducto queda sin flujo seguro;
+    se fija como límite de operación (criterio propio, declarado)."""
 
     capacidad_plenum_kj_k: float = 15.0
     """Masa térmica de resistencia + plenum: ~30 kg de lámina de acero
@@ -168,9 +177,23 @@ class ParametrosSecador:
     def caudal_m3_s(self) -> float:
         return self.caudal_especifico_m3_min_kg * self.masa_cps_kg / 60.0
 
-    def masa_aire_kg_s(self, t_c: float = 20.0) -> float:
-        """Flujo másico de aire seco [kg/s], caudal medido a la entrada del ventilador."""
-        return self.caudal_m3_s * densidad_aire(t_c)
+    def masa_aire_kg_s(self, t_c: float = 20.0, fan_frac: float = 1.0) -> float:
+        """Flujo másico de aire seco [kg/s], caudal medido a la entrada del
+        ventilador. ``fan_frac``: fracción del caudal nominal (manipulada 2)."""
+        return self.caudal_m3_s * fan_frac * densidad_aire(t_c)
+
+    def limitar_fan_frac(self, fan_frac: float) -> float:
+        """Recorta la consigna de caudal al rango [caudal_min_frac, 1]."""
+        return min(1.0, max(self.caudal_min_frac, float(fan_frac)))
+
+    def potencia_ventilador_frac_kw(self, fan_frac: float) -> float:
+        """Potencia eléctrica del ventilador a caudal parcial por las leyes de
+        afinidad (P proporcional al cubo del caudal; ASHRAE Handbook -
+        HVAC Systems and Equipment, cap. Fans). Es el caso ideal (variador
+        de frecuencia); con regulador de tensión el ahorro real es menor.
+        El ventilador es ~5 % de la energía total del secado, así que esta
+        incertidumbre pesa poco en el balance."""
+        return self.potencia_ventilador_kw * fan_frac**3
 
     def area_lecho_m2(self, m0_bs_pct: float) -> float:
         """Área de la bandeja para que el lote húmedo quepa en espesor_lecho_m."""
@@ -191,6 +214,7 @@ def paso_plenum(
     fan_cmd: int,
     dt_h: float,
     p: ParametrosSecador,
+    fan_frac: float = 1.0,
 ) -> tuple[float, float]:
     """Avanza la temperatura del plenum ``dt_h`` horas.
 
@@ -200,7 +224,7 @@ def paso_plenum(
     """
     heater = 1 if (heater_cmd and fan_cmd) else 0          # enclavamiento de flujo
     p_res = p.potencia_resistencia_kw * heater
-    g = p.ua_plenum_kw_k + (p.masa_aire_kg_s(t_ambiente_c) * CP_AIRE if fan_cmd else 0.0)  # kW/K
+    g = p.ua_plenum_kw_k + (p.masa_aire_kg_s(t_ambiente_c, fan_frac) * CP_AIRE if fan_cmd else 0.0)  # kW/K
     t_eq = t_ambiente_c + p_res / g
     tau_s = p.capacidad_plenum_kj_k / g
     t_nuevo = t_eq + (t_process_c - t_eq) * math.exp(-dt_h * 3600.0 / tau_s)
