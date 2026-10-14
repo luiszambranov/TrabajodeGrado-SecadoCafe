@@ -1,6 +1,6 @@
 # Tabla de variables del sistema
 
-Versión: 6 oct 2026. Fuente única de verdad en el código:
+Versión: 14 oct 2026 (registros 21 y 24–25). Fuente única de verdad en el código:
 `python/modbus_server.py` (mapa de registros), `python/dinamica_termica.py`
 (`ParametrosSecador`), `python/control_supervisado.py` (`ParametrosControl`),
 `python/cinetica_roa.py`, `python/generador_ambiente.py` y
@@ -48,8 +48,9 @@ palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0
 | 16–17 | `M_coffee_max` | REAL | % b.h. | Python → CODESYS | 11–56 | `M_coffee_max` |
 | 18–19 | `heater_duty` | REAL | % | Python → CODESYS | 0–100 | `heater_duty` |
 | 20 | `fan_speed_pct` | WORD | % del nominal | CODESYS → Python | 30–100 (0 = 100 %) | `fan_speed_pct` |
-| 21 | (libre) | – | – | – | – | – |
+| 21 | `reset_lote_cmd` | WORD 0/1 | – | CODESYS → Python | pulso de 3 s (flanco 0→1 = nuevo lote) | `reset_lote_cmd` (v5) |
 | 22–23 | `caudal` | REAL | m³/min | Python → CODESYS | 0–8 | `caudal_m3_min` |
+| 24–25 | `energia_kWh` | REAL | kWh | Python → CODESYS | 0–~150 por lote | `energia_kWh` (v5) |
 
 Seguridad: si CODESYS no escribe en 5 s, Python fuerza resistencia y
 ventilador a 0 y publica `safety_ok = 0`. Si `heartbeat` no cambia en 4 s,

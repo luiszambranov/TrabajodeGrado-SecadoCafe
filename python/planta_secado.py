@@ -149,6 +149,13 @@ class ModeloSecadoPlant(Plant):
         self._heater_on = 0
         self.modo_lazo = self._resolver_modo(periodo_s)
 
+    def reset_lote(self) -> None:
+        """Nuevo lote (registro 21): secador nuevo con la humedad inicial,
+        tiempo de proceso y contadores de energía en cero. Mismo clima y
+        parámetros (14 oct 2026)."""
+        self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
+        self._heater_on = 0
+
     def _resolver_modo(self, periodo_s: float) -> str:
         modo = self.params.lazo_termico
         tau_s = constante_tiempo_plenum_s(self.params.secador)
@@ -220,6 +227,7 @@ class ModeloSecadoPlant(Plant):
             m_coffee_max_pct=e.m_capa_max_bh_pct,
             heater_duty_pct=duty,
             caudal_m3_min=e.caudal_m3_min,
+            energia_kwh=self.secador.c.energia_electrica_kwh,
         )
 
 

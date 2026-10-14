@@ -81,8 +81,16 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
                                                            caudal del ventilador (manipulada 2), % del
                                                            nominal (8 m3/min). 0 = no configurado ->
                                                            100 %; 1-29 se recorta a 30 % (mínimo).
+    21          reset_lote_cmd WORD (0 o 1)     -        CODESYS -> Python (14 oct 2026): flanco 0->1
+                                                           = "Nuevo lote". Python reinicia el lote
+                                                           (humedad inicial, tiempo y energía a cero).
+                                                           CODESYS lo mantiene en 1 unos segundos
+                                                           (pulso) y luego vuelve a 0.
     22-23       caudal        REAL (float32)    m3/min   Python -> CODESYS (5 oct 2026): caudal real
                                                            aplicado (0 con el ventilador apagado)
+    24-25       energia_kWh   REAL (float32)    kWh      Python -> CODESYS (14 oct 2026): energía
+                                                           eléctrica acumulada del lote (resistencia
+                                                           + ventilador). Vuelve a 0 con "Nuevo lote".
 
     RH_ambient vs RH_process (separados el 29 sept 2026)
     ------------------------------------------------------
@@ -216,8 +224,10 @@ REG_FLOW_DIR_CMD = 15  # 1 registro: 0/1, sentido del aire en el lecho (CODESYS 
 REG_M_COFFEE_MAX = 16  # 2 registros: float32, humedad de la capa más húmeda (% b.h.)
 REG_HEATER_DUTY = 18   # 2 registros: float32, ciclo de trabajo de la resistencia [%] (4 oct 2026)
 REG_FAN_SPEED_CMD = 20 # 1 registro: consigna de caudal 0-100 % (CODESYS -> Python, 5 oct 2026)
+REG_RESET_LOTE_CMD = 21  # 1 registro: flanco 0->1 = nuevo lote (CODESYS -> Python, 14 oct 2026)
 REG_CAUDAL = 22        # 2 registros: float32, caudal real [m3/min] (Python -> CODESYS, 5 oct 2026)
-NUM_HOLDING_REGS = 24  # 0-23 (5 oct 2026: caudal variable)
+REG_ENERGIA = 24       # 2 registros: float32, energía eléctrica del lote [kWh] (Python -> CODESYS, 14 oct 2026)
+NUM_HOLDING_REGS = 26  # 0-25 (14 oct 2026: nuevo lote + energía)
 
 HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
 
@@ -310,6 +320,8 @@ class PlantOutputs:
     m_coffee_max_pct: float | None = None
     heater_duty_pct: float | None = None
     caudal_m3_min: float | None = None
+    energia_kwh: float | None = None
+    # Energía eléctrica acumulada del lote [kWh] -- 24-25 (14 oct 2026). None -> ToyPlant.
     # Caudal real aplicado [m3/min] -- 22-23 (5 oct 2026). None -> ToyPlant.
     # Ciclo de trabajo de la resistencia en el ultimo ciclo [%] -- 18-19
     # (4 oct 2026, lazo termico local). None -> ToyPlant.
@@ -338,6 +350,11 @@ class Plant(abc.ABC):
 
     Cualquier planta nueva solo necesita implementar ``step()``.
     """
+
+    def reset_lote(self) -> None:
+        """Reinicia la planta para un lote nuevo (registro 21, "Nuevo lote"
+        en la HMI). Por defecto no hace nada (ToyPlant no tiene lote)."""
+        return None
 
     @abc.abstractmethod
     def step(self, dt_s: float, inputs: PlantInputs) -> PlantOutputs:
@@ -427,6 +444,8 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_HEATER_DUTY, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_FAN_SPEED_CMD, [0])
     slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_RESET_LOTE_CMD, [0])
+    slave_ctx.setValues(3, REG_ENERGIA, float_to_registers(0.0))
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -442,7 +461,17 @@ def bucle_planta(
     resultado — cada ``periodo_s`` segundos."""
 
     heartbeat = 0
+    reset_anterior = 0
     while not stop_event.is_set():
+        # "Nuevo lote" (registro 21): se actúa en el FLANCO 0 -> 1, porque
+        # CODESYS escribe el registro en cada ciclo; mientras siga en 1 no
+        # se vuelve a reiniciar.
+        reset_cmd = slave_ctx.getValues(3, REG_RESET_LOTE_CMD, count=1)[0]
+        if reset_cmd == 1 and reset_anterior == 0:
+            plant.reset_lote()
+            log.info("NUEVO LOTE: planta reiniciada (humedad inicial, tiempo y energía a cero).")
+        reset_anterior = reset_cmd
+
         heater_cmd_bruto = slave_ctx.getValues(3, REG_HEATER_CMD, count=1)[0]
         fan_cmd_bruto = slave_ctx.getValues(3, REG_FAN_CMD, count=1)[0]
         plant_mode = slave_ctx.getValues(3, REG_PLANT_MODE, count=1)[0]
@@ -475,6 +504,8 @@ def bucle_planta(
             slave_ctx.setValues(3, REG_HEATER_DUTY, float_to_registers(outputs.heater_duty_pct))
         if outputs.caudal_m3_min is not None:
             slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(outputs.caudal_m3_min))
+        if outputs.energia_kwh is not None:
+            slave_ctx.setValues(3, REG_ENERGIA, float_to_registers(outputs.energia_kwh))
 
         # Heartbeat: se incrementa y publica SIEMPRE, incluso con
         # comm_lost=True -- es la señal de "el proceso Python sigue
@@ -588,7 +619,7 @@ def main() -> None:
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
         "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2) | hr[13-14]=RH_process | "
         "hr[15]=flow_dir_cmd | hr[16-17]=M_coffee_max | hr[18-19]=heater_duty | "
-        "hr[20]=fan_speed_pct | hr[22-23]=caudal"
+        "hr[20]=fan_speed_pct | hr[21]=reset_lote_cmd | hr[22-23]=caudal | hr[24-25]=energia_kWh"
     )
     log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")
