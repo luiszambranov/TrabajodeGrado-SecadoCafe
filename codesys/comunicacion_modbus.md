@@ -767,3 +767,30 @@ Nuevos registros (el servidor ahora tiene 24 registros, 0-23):
   (BOOL para la lámpara).
 - HMI: control deslizante o campo numérico sobre `PLC_PRG.fan_speed_pct`
   (30-100) y un recuadro con `PLC_PRG.caudal_m3_min`.
+
+
+## 9. HMI final, modelo congelado y consigna del perfil — 19 oct 2026
+
+**Programa vigente:** `codesys/v7/` (E_ESTADO, GVL_SECUENCIA, PLC_PRG, SECUENCIA). `v6/` agregó el modo `sin_fluidsim` y `lote_preparado := TRUE` al arrancar; `v7/` agregó la selección de perfil térmico.
+
+**Lado Python (`modbus_server.py`, `planta_secado.py`):**
+- El servidor arranca con `plant_mode = HOLD` y, en HOLD, avanza la planta con paso 0 s: no corren tiempo, humedad ni energía. Antes, el modelo avanzaba desde que se iniciaba el server y en PARO.
+- Registro nuevo 26, `setpoint_cmd` (WORD, °C enteros, CODESYS → Python). El termostato local usa ese valor; 0 = 50 °C por defecto. El servidor pasa a 27 registros (0–26). La consola muestra `SP=.. C | caudal_cmd=.. %`.
+
+**Canal nuevo en CODESYS:**
+
+| Canal | Tipo de acceso | Desplazamiento WRITE | Longitud | Variable |
+|---|---|---|---|---|
+| `setpoint_cmd` | Write Single Register (FC06) | 16#001A (26) | 1 | `Application.PLC_PRG.setpoint_cmd` |
+
+**Lógica (PLC_PRG v7):** `perfil_sel` (0 REF, 1 P1, 2 P2, 3 P3) y `caudal_sel` se copian a `perfil_activo` / `caudal_activo` solo en REPOSO; durante el lote quedan fijos. En P2/P3 el cambio de consigna ocurre con `M_coffee ≤ 30 %` y queda enclavado (`cambio_perfil`). `setpoint_cmd := REAL_TO_WORD(setpoint)`.
+
+**HMI:** lista de textos `TL_Perfiles` (ID 0–3) en un cuadro combinado sobre `PLC_PRG.perfil_sel`; campo "Setpoint" sobre `PLC_PRG.setpoint`; texto del perfil activo `PLC_PRG.perfil_txt`. START/STOP de HMI y FluidSIM actúan en paralelo (botones en modo "Pulsar").
+
+**Errores de esta sesión (para no repetirlos):**
+1. *START no hacía nada sin FluidSIM:* STOP y EMERGENCIA son NC; sin FluidSIM el PLC los ve pulsados. Solución: `GVL_SECUENCIA.sin_fluidsim := TRUE` para probar sin FluidSIM.
+2. *Con FluidSIM no se movían los cilindros:* con `sin_fluidsim = TRUE` el cilindro simulado "llega" en el mismo ciclo y la bobina dura un ciclo; FluidSIM no la ve. Con FluidSIM conectado, `sin_fluidsim := FALSE`.
+3. *Variables nuevas en la GVL:* hace falta **Reiniciar en frío** para que tomen su valor inicial.
+4. *Al copiar un cuadro combinado o un campo de texto,* conserva la variable del original: revisar siempre la propiedad de variable.
+
+Evidencias: `evidencia_hmi_v7_reposo_P2.png`, `evidencia_hmi_v7_secado_P2_55C.png`, `evidencia_fluidsim_circuito_v7.png`.

@@ -91,6 +91,11 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
     24-25       energia_kWh   REAL (float32)    kWh      Python -> CODESYS (14 oct 2026): energía
                                                            eléctrica acumulada del lote (resistencia
                                                            + ventilador). Vuelve a 0 con "Nuevo lote".
+    26          setpoint_cmd  WORD (°C entero)  °C       CODESYS -> Python (19 oct 2026): consigna de
+                                                           T_process que calcula el PLC según el perfil
+                                                           térmico elegido en la HMI (REF 50, P1 45,
+                                                           P2 55->35, P3 35->55). La usa el termostato
+                                                           local. 0 = no configurado -> 50 °C.
 
     RH_ambient vs RH_process (separados el 29 sept 2026)
     ------------------------------------------------------
@@ -227,7 +232,8 @@ REG_FAN_SPEED_CMD = 20 # 1 registro: consigna de caudal 0-100 % (CODESYS -> Pyth
 REG_RESET_LOTE_CMD = 21  # 1 registro: flanco 0->1 = nuevo lote (CODESYS -> Python, 14 oct 2026)
 REG_CAUDAL = 22        # 2 registros: float32, caudal real [m3/min] (Python -> CODESYS, 5 oct 2026)
 REG_ENERGIA = 24       # 2 registros: float32, energía eléctrica del lote [kWh] (Python -> CODESYS, 14 oct 2026)
-NUM_HOLDING_REGS = 26  # 0-25 (14 oct 2026: nuevo lote + energía)
+REG_SETPOINT_CMD = 26  # 1 registro: consigna de T_process en °C enteros (CODESYS -> Python, 19 oct 2026)
+NUM_HOLDING_REGS = 27  # 0-26 (19 oct 2026: consigna del perfil térmico)
 
 HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
 
@@ -296,6 +302,7 @@ class PlantInputs:
     comm_lost: bool
     flow_dir_cmd: int = 0  # 0 = aire de abajo hacia arriba, 1 = invertido
     fan_speed_pct: int = 0  # consigna de caudal 0-100 % (0 = no configurado -> 100 %)
+    setpoint_c: float = 0.0  # consigna de T_process desde el PLC (0 = no configurado -> valor por defecto)
 
 
 @dataclass
@@ -430,7 +437,8 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_HEATER_CMD, [0])
     slave_ctx.setValues(3, REG_FAN_CMD, [0])
     slave_ctx.setValues(3, REG_RH_AMBIENT, float_to_registers(ToyPlant.RH_NOMINAL_PCT))
-    slave_ctx.setValues(3, REG_PLANT_MODE, [PLANT_MODE_RUN])
+    # 19 oct 2026: arranca en HOLD; solo pasa a RUN cuando CODESYS lo pide (START).
+    slave_ctx.setValues(3, REG_PLANT_MODE, [PLANT_MODE_HOLD])
     slave_ctx.setValues(3, REG_SAFETY_OK, [1])
     # M_coffee: valor inicial 0.0 -- solo tiene significado real cuando
     # la planta es ModeloSecadoPlant (ver planta_secado.py); con
@@ -446,6 +454,7 @@ def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(0.0))
     slave_ctx.setValues(3, REG_RESET_LOTE_CMD, [0])
     slave_ctx.setValues(3, REG_ENERGIA, float_to_registers(0.0))
+    slave_ctx.setValues(3, REG_SETPOINT_CMD, [0])
     return ModbusServerContext(slaves=slave_ctx, single=True), hr_block
 
 
@@ -477,16 +486,21 @@ def bucle_planta(
         plant_mode = slave_ctx.getValues(3, REG_PLANT_MODE, count=1)[0]
         flow_dir_bruto = slave_ctx.getValues(3, REG_FLOW_DIR_CMD, count=1)[0]
         fan_speed_bruto = slave_ctx.getValues(3, REG_FAN_SPEED_CMD, count=1)[0]
+        setpoint_bruto = slave_ctx.getValues(3, REG_SETPOINT_CMD, count=1)[0]
 
         comm_lost = watched_block.seconds_since_last_actuator_write() > WATCHDOG_TIMEOUT_S
         heater_cmd = 0 if comm_lost else heater_cmd_bruto
         fan_cmd = 0 if comm_lost else fan_cmd_bruto
 
+        # 19 oct 2026: en HOLD (REPOSO, PARO, FIN_SECADO en CODESYS) el
+        # modelo se CONGELA (paso de 0 s): no avanzan el tiempo de proceso,
+        # la humedad del cafe ni la energia. El secado solo corre tras START.
+        dt_paso_s = 0.0 if plant_mode == PLANT_MODE_HOLD else periodo_s
         outputs = plant.step(
-            periodo_s,
+            dt_paso_s,
             PlantInputs(heater_cmd=heater_cmd, fan_cmd=fan_cmd, plant_mode=plant_mode, comm_lost=comm_lost,
                         flow_dir_cmd=0 if comm_lost else flow_dir_bruto,
-                        fan_speed_pct=fan_speed_bruto),
+                        fan_speed_pct=fan_speed_bruto, setpoint_c=float(setpoint_bruto)),
         )
 
         slave_ctx.setValues(3, REG_T_PROCESS, float_to_registers(outputs.t_process_c))
@@ -522,7 +536,7 @@ def bucle_planta(
         caudal_str = f"{outputs.caudal_m3_min:4.1f}" if outputs.caudal_m3_min is not None else " n/a"
         log.info(
             "t=%s | T_process=%6.2fC | RH_ambient=%5.1f%% | RH_process=%s | M_coffee=%s | heater_duty=%s | caudal=%s m3/min | heater_cmd=%s | "
-            "fan_cmd=%s | plant_mode=%s | safety=%s | heartbeat=%s",
+            "fan_cmd=%s | plant_mode=%s | SP=%s C | caudal_cmd=%s %% | safety=%s | heartbeat=%s",
             tiempo_str,
             outputs.t_process_c,
             outputs.rh_ambient_pct,
@@ -533,6 +547,8 @@ def bucle_planta(
             heater_cmd_bruto,
             fan_cmd_bruto,
             plant_mode,
+            setpoint_bruto,
+            fan_speed_bruto,
             estado,
             heartbeat,
         )
@@ -619,7 +635,7 @@ def main() -> None:
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
         "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2) | hr[13-14]=RH_process | "
         "hr[15]=flow_dir_cmd | hr[16-17]=M_coffee_max | hr[18-19]=heater_duty | "
-        "hr[20]=fan_speed_pct | hr[21]=reset_lote_cmd | hr[22-23]=caudal | hr[24-25]=energia_kWh"
+        "hr[20]=fan_speed_pct | hr[21]=reset_lote_cmd | hr[22-23]=caudal | hr[24-25]=energia_kWh | hr[26]=setpoint_cmd"
     )
     log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")

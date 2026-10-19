@@ -147,6 +147,7 @@ class ModeloSecadoPlant(Plant):
         self.params = params or ParametrosModeloSecadoPlant()
         self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
         self._heater_on = 0
+        self._sp_plc_c = 0.0   # consigna recibida del PLC (19 oct 2026); 0 = usar params.setpoint_c
         self.modo_lazo = self._resolver_modo(periodo_s)
 
     def reset_lote(self) -> None:
@@ -174,7 +175,10 @@ class ModeloSecadoPlant(Plant):
 
     def _termostato(self, t_process: float) -> int:
         """Todo/nada local, mismo criterio que control_supervisado.todo_nada."""
-        sp, hy = self.params.setpoint_c, self.params.histeresis_c
+        # 19 oct 2026: la consigna la decide el PLC (perfil térmico de la HMI,
+        # registro 26); si no llega (0), se usa la de los parámetros (50 °C).
+        sp = self._sp_plc_c if self._sp_plc_c > 0 else self.params.setpoint_c
+        hy = self.params.histeresis_c
         if t_process < sp - hy:
             self._heater_on = 1
         elif t_process >= sp + hy:
@@ -188,6 +192,7 @@ class ModeloSecadoPlant(Plant):
 
     def step(self, dt_s: float, inputs: PlantInputs) -> PlantOutputs:
         dt_h = (dt_s / 3600.0) * self.params.factor_aceleracion
+        self._sp_plc_c = inputs.setpoint_c
 
         # HOLD explicito de CODESYS tambien fuerza heater/fan a 0 (mismo
         # criterio que ToyPlant; comm_lost ya viene resuelto por el

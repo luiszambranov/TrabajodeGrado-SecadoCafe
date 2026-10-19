@@ -89,11 +89,11 @@ caja(xs[1], by, bw, bh, 2, "VENTILADOR", "Manipulada 2 · S&P CBM/6-180/180-N-72
 ], C_PY)
 
 caja(xs[2], by, bw, bh, 3, "RESISTENCIA + PLENUM", "dinamica_termica.py · Manipulada 1", [
-    ("Entradas", ["T_ambiente, ea, ṁ_aire", "Permiso: RUN y fan_cmd = 1", "Setpoint 50 °C (máx. del grano)"]),
-    ("Calcula (cada 1 s de modelo)", ["Termostato: ON si T_process < 50", "Balance de energía del aire:",
+    ("Entradas", ["T_ambiente, ea, ṁ_aire", "Permiso: RUN y fan_cmd = 1", "setpoint_cmd del perfil (35–55 °C)"]),
+    ("Calcula (cada 1 s de modelo)", ["Termostato: ON si T_process < SP", "Balance de energía del aire:",
                                       "  C·dT/dt = P_res − ṁ·cp·(T − T_amb)", "P_res = 6 kW (3 × 2 kW, Tempco)",
                                       "Constante de tiempo ≈ 106 s", "RH_process = ea / es(T_process)"]),
-    ("Salidas", ["T_process  ≈ 50 °C  (CONTROLADA)", "RH_process ≈ 15 %", "heater_duty  [% tiempo ON]"]),
+    ("Salidas", ["T_process ≈ SP  (CONTROLADA)", "RH_process ≈ 15 %", "heater_duty  [% tiempo ON]"]),
 ], C_PY)
 
 caja(xs[3], by, bw, bh, 4, "LECHO DE CAFÉ: 8 CAPAS", "lecho_secado.py + cinetica_roa.py", [
@@ -107,9 +107,9 @@ caja(xs[3], by, bw, bh, 4, "LECHO DE CAFÉ: 8 CAPAS", "lecho_secado.py + cinetic
 caja(xs[4], by, bw, bh, 5, "ENERGÍA Y TIEMPO", "secador_electrico.py", [
     ("Calcula", ["E_resistencia = Σ P_res · Δt", "E_ventilador = Σ P_vent · Δt", "kWh por kg de café",
                  "kJ por kg de agua evaporada", "tiempo_proceso_h (horas de modelo)"]),
-    ("Escala de tiempo", ["1 ciclo = 1 s real", "factor 540 → 0.15 h de modelo", "Secado completo ≈ 3.7 min reales",
+    ("Escala de tiempo", ["1 ciclo = 1 s real", "factor 540 → 0.15 h de modelo", "Modelo congelado en HOLD",
                           "Termostato: 1 s · Lecho: 1 min"]),
-    ("Salidas", ["tiempo_proceso_h", "heartbeat (+1 cada ciclo)", "safety_ok (watchdog Python)"]),
+    ("Salidas", ["tiempo_proceso_h · energia_kWh", "heartbeat (+1 cada ciclo)", "safety_ok (watchdog Python)"]),
 ], C_PY)
 
 # flechas entre cajas de la planta
@@ -127,10 +127,10 @@ t(W / 2, my + 30, "MODBUS TCP · 127.0.0.1 : 5020 · Python = esclavo · CODESYS
   C_MB[0], "middle")
 t(50, my + 62, "Flechas verdes: Python → CODESYS (lectura FC03, cada REAL = 2 registros):", 15, "bold", C_PY[0])
 t(50, my + 86, "0-1 T_process · 4-5 RH_ambient · 7 safety_ok · 8-9 M_coffee · 10-11 tiempo_proceso_h · 12 heartbeat", 14)
-t(50, my + 108, "13-14 RH_process · 16-17 M_coffee_max · 18-19 heater_duty · 22-23 caudal_m3_min", 14)
+t(50, my + 108, "13-14 RH_process · 16-17 M_coffee_max · 18-19 heater_duty · 22-23 caudal_m3_min · 24-25 energia_kWh", 14)
 t(1080, my + 62, "Flechas azules: CODESYS → Python (escritura FC06):", 15, "bold", C_CS[0])
 t(1080, my + 86, "2 heater_cmd · 3 fan_cmd · 6 plant_mode (0 RUN / 1 HOLD)", 14)
-t(1080, my + 108, "15 flow_dir_cmd · 20 fan_speed_pct", 14)
+t(1080, my + 108, "15 flow_dir_cmd · 20 fan_speed_pct · 21 reset_lote_cmd · 26 setpoint_cmd", 14)
 t(50, my + 136, "Watchdog Python: si CODESYS no escribe en 5 s → heater y fan forzados a 0, safety_ok = 0.   "
                 "Watchdog CODESYS: si heartbeat no cambia en 4 s → comm_error.", 13, "normal", "#455a64")
 GV, AZ = "#2e7d32", "#1565c0"
@@ -151,7 +151,7 @@ for x in (760, 980):
 cy = 880
 out.append(f'<rect x="20" y="{cy}" width="{W - 40}" height="405" rx="14" fill="none" stroke="{C_CS[0]}" '
            'stroke-width="2" stroke-dasharray="8 6"/>')
-t(W - 40, cy + 26, "CODESYS CONTROL WIN V3 — SUPERVISIÓN (PLC_PRG v3) Y HMI", 16, "bold", C_CS[0], "end")
+t(W - 40, cy + 26, "CODESYS CONTROL WIN V3 — SUPERVISIÓN (PLC_PRG v7 + SECUENCIA) Y HMI", 16, "bold", C_CS[0], "end")
 cby, cbh = cy + 40, 350
 caja(40, cby, 470, cbh, 6, "COMUNICACIÓN Y SEGURIDAD", "PLC_PRG · canales Modbus_TCP_Slave", [
     ("Recibe y convierte", ["2 WORD → REAL (U_WORDS_TO_REAL)", "T_process, M_coffee, M_coffee_max,",
@@ -159,24 +159,25 @@ caja(40, cby, 470, cbh, 6, "COMUNICACIÓN Y SEGURIDAD", "PLC_PRG · canales Modb
     ("Vigila", ["heartbeat congelado 4 s → comm_error", "safety_alarm = (safety_ok = 0) OR comm_error",
                 "Con comm_error todo pasa a valor seguro"]),
 ], C_CS)
-caja(530, cby, 640, cbh, 7, "LÓGICA DE SUPERVISIÓN", "PLC_PRG v3 · decide los comandos", [
-    ("Condición de marcha", ["en_marcha = RUN AND NOT comm_error AND NOT fin_secado"]),
-    ("Comandos que envía a Python", ["fan_cmd = en_marcha", "heater_cmd = en_marcha  (permiso; Python regula a 50 °C)",
-                                    "flow_dir_cmd = (TRUNC(tiempo)/6) MOD 2 → invierte el aire cada 6 h",
-                                    "fan_speed_pct = consigna del HMI, limitada a 30 – 100 %"]),
-    ("Fin del secado (se enclava)", ["M_coffee ≤ 11 %  Y  M_coffee_max ≤ 12 %  →  apaga todo",
-                                     "reset_lote: borra fin_secado (nuevo lote)"]),
+caja(530, cby, 640, cbh, 7, "LÓGICA DE SUPERVISIÓN", "PLC_PRG v7 + SECUENCIA (máquina de estados)", [
+    ("Secuencia (SECUENCIA, CASE OF)", ["REPOSO → CARGA → SECADO ⇄ INVERSIÓN → ENFRIAMIENTO",
+                                       "  → FIN DE SECADO → DESCARGA; PARO, FALLA, EMERGENCIA",
+                                       "planta_run → plant_mode (HOLD congela el modelo)"]),
+    ("Comandos que envía a Python (PLC_PRG)", ["fan_cmd / heater_cmd = permiso según estado y comm_error",
+                                    "setpoint_cmd = perfil (REF, P1, P2, P3; cambio al 30 % b.h.)",
+                                    "fan_speed_pct = caudal del lote (30, 75 o 100 %)",
+                                    "flow_dir_cmd = posición real de la compuerta (1B2)"]),
+    ("Fin del secado (se enclava)", ["M_coffee ≤ 11 %  Y  M_coffee_max ≤ 12 %  →  ENFRIAMIENTO"]),
 ], C_CS)
-caja(1190, cby, 400, cbh, 8, "HMI", "Visualización de destino / web", [
-    ("Muestra", ["T_process · RH_ambient · RH_process", "M_coffee · M_coffee_max · tiempo",
-                 "heater_duty · caudal_m3_min · setpoint"]),
-    ("Pilotos", ["Heater · Fan · Comunicación", "Planta en marcha · Aire invertido", "Secado terminado"]),
-    ("Mandos y gráfica", ["Modo RUN/HOLD · caudal % · Nuevo lote", "Tendencia: curva de secado"]),
+caja(1190, cby, 400, cbh, 8, "HMI", "Visualización CODESYS", [
+    ("Muestra", ["T_process · setpoint · tiempo · energía", "M_coffee · caudal_m3_min · heater_duty",
+                 "Tendencias de T y humedad"]),
+    ("Pilotos", ["Semáforo · comunicación · fin de secado", "Ventilador · resistencias · aire invertido"]),
+    ("Mandos", ["START · STOP · Nuevo lote", "Selección de perfil y caudal (en REPOSO)"]),
 ], C_CS)
-caja(1610, cby, 330, cbh, 9, "FLUIDSIM (OPC)", "Actuación neumática", [
-    ("Recibe de CODESYS", ["flow_dir_cmd → cilindro", "  doble efecto que mueve", "  la compuerta del aire",
-                           "Ciclo carga / descarga", "  (máquina de estados)"]),
-    ("Estado", ["Integración OPC probada;", "  circuito completo en", "  desarrollo"]),
+caja(1610, cby, 330, cbh, 9, "FLUIDSIM (OPC)", "Actuación electroneumática", [
+    ("Recibe de CODESYS (OUTPUT0)", ["Bobinas compuerta y bandeja", "Relé K1 del ventilador", "Semáforo"]),
+    ("Envía a CODESYS (INPUT0)", ["EMERGENCIA, START, STOP", "Finales 1B1/1B2 (compuerta)", "Finales 2B1/2B2 (bandeja)"]),
 ], C_EXT)
 flecha(511, cby + 175, 527, cby + 175)
 flecha(1171, cby + 175, 1187, cby + 175)

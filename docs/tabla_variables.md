@@ -1,6 +1,6 @@
 # Tabla de variables del sistema
 
-Versión: 14 oct 2026 (registros 21 y 24–25). Fuente única de verdad en el código:
+Versión: 19 oct 2026 (registro 26 `setpoint_cmd`; modelo congelado en HOLD). Fuente única de verdad en el código:
 `python/modbus_server.py` (mapa de registros), `python/dinamica_termica.py`
 (`ParametrosSecador`), `python/control_supervisado.py` (`ParametrosControl`),
 `python/cinetica_roa.py`, `python/generador_ambiente.py` y
@@ -11,10 +11,11 @@ actualiza aquí.
 
 | Tipo | Variable | Unidad | Quién la fija o la mide |
 |---|---|---|---|
-| **Controlada** | Temperatura del aire de secado, `T_process` (plenum, entrada al lecho) | °C | Termostato todo/nada contra el setpoint del perfil térmico |
+| **Controlada** | Temperatura del aire de secado, `T_process` (plenum, entrada al lecho) | °C | Termostato todo/nada contra la consigna del perfil térmico que calcula el PLC (`setpoint_cmd`, registro 26) |
 | **Controlada (criterio de parada)** | Humedad del café: promedio del lote `M_coffee` y capa más húmeda `M_coffee_max` | % b.h. | Parada con promedio ≤ 11 % **y** capa más húmeda ≤ 12 % |
 | **Manipulada 1** | Potencia de la resistencia (encendida/apagada, 6 kW), `heater_cmd` / `heater_duty` | – / % | Lazo térmico |
-| **Manipulada 2** | Caudal del ventilador, `fan_speed_pct` → `caudal` | % / m³/min | Perfil (30, 75 o 100 % de 8 m³/min) |
+| **Manipulada 2** | Caudal del ventilador, `fan_speed_pct` → `caudal` | % / m³/min | Elegido en la HMI antes de START (30, 75 o 100 % de 8 m³/min), fijo durante el lote |
+| **Referencia** | Consigna de temperatura `setpoint_cmd` | °C | Perfil elegido en la HMI (REF 50, P1 45, P2 55→35, P3 35→55 °C; cambio al 30 % b.h.) |
 | **Manipulada discreta** | Sentido del aire en el lecho, `flow_dir_cmd` | 0/1 | Inversión cada 6 h (SECAFÉ, 2008) |
 | **Perturbación** | Temperatura ambiente | °C | Clima de Chinchiná (Naranjal + NASA POWER), aleatorio día a día |
 | **Perturbación** | Humedad relativa ambiente `RH_ambient` (vía presión de vapor `ea`) | % | Ídem |
@@ -32,7 +33,7 @@ Holding registers, puerto 5020, periodo del servidor 1 s. Los REAL ocupan 2
 registros (palabra alta primero); en CODESYS se arma el `UNION` con la
 palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0).
 
-| Dir. | Tag | Tipo | Unidad | Sentido | Rango típico | Variable en `PLC_PRG_v3` |
+| Dir. | Tag | Tipo | Unidad | Sentido | Rango típico | Variable en `PLC_PRG` (v7) |
 |---|---|---|---|---|---|---|
 | 0–1 | `T_process` | REAL | °C | Python → CODESYS | 15–60 | `T_process` |
 | 2 | `heater_cmd` | WORD 0/1 | – | CODESYS → Python | 0/1 | `heater_cmd` |
@@ -51,6 +52,9 @@ palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0
 | 21 | `reset_lote_cmd` | WORD 0/1 | – | CODESYS → Python | pulso de 3 s (flanco 0→1 = nuevo lote) | `reset_lote_cmd` (v5) |
 | 22–23 | `caudal` | REAL | m³/min | Python → CODESYS | 0–8 | `caudal_m3_min` |
 | 24–25 | `energia_kWh` | REAL | kWh | Python → CODESYS | 0–~150 por lote | `energia_kWh` (v5) |
+| 26 | `setpoint_cmd` | WORD | °C enteros | CODESYS → Python | 35–55 (0 = 50 °C por defecto) | `setpoint_cmd` (v7) |
+
+Modo de planta: el servidor arranca en HOLD y, mientras `plant_mode = 1` (REPOSO, PARO, FIN DE SECADO), el modelo se congela: no avanzan tiempo, humedad ni energía (19 oct 2026).
 
 Seguridad: si CODESYS no escribe en 5 s, Python fuerza resistencia y
 ventilador a 0 y publica `safety_ok = 0`. Si `heartbeat` no cambia en 4 s,

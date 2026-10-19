@@ -1,7 +1,7 @@
 # /python — planta simulada, campaña Monte Carlo y análisis
 
-Estado: 6 oct 2026. Modelo cerrado, campaña Monte Carlo ejecutada (150
-realizaciones). Lo retirado está en `legacy/` (ver `legacy/README.md` y
+Estado: 19 oct 2026. Modelo cerrado, campaña Monte Carlo ejecutada (150
+realizaciones) y planta integrada con la HMI final (CODESYS v7). Lo retirado está en `legacy/` (ver `legacy/README.md` y
 `../docs/evolucion_del_modelo.md`).
 
 ## Cómo correr
@@ -79,8 +79,8 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 
 | Archivo | Qué hace |
 |---|---|
-| `modbus_server.py` | Servidor Modbus TCP (Python = esclavo). 24 registros, watchdog, `heartbeat`. Mapa completo en `../docs/tabla_variables.md`. |
-| `planta_secado.py` | `ModeloSecadoPlant`: la física de `secador_electrico.py` detrás de la interfaz `Plant`. Lazo térmico local cuando la simulación va acelerada (corrección del 4 oct 2026). |
+| `modbus_server.py` | Servidor Modbus TCP (Python = esclavo). 27 registros (0–26), watchdog, `heartbeat`. Arranca en HOLD y congela el modelo mientras `plant_mode = 1` (19 oct 2026). Mapa completo en `../docs/tabla_variables.md`. |
+| `planta_secado.py` | `ModeloSecadoPlant`: la física de `secador_electrico.py` detrás de la interfaz `Plant`. Lazo térmico local cuando la simulación va acelerada (corrección del 4 oct 2026); desde el 19 oct 2026 el termostato usa la consigna que envía el PLC (registro 26; 0 = 50 °C). |
 
 ### Campaña, análisis, validación y energía
 

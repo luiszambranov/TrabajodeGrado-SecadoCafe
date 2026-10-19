@@ -8,18 +8,18 @@ Trabajo de grado — Diplomado en Automatización Industrial, Ingeniería
 Mecatrónica, Uniagustiniana.
 **Estudiantes:** Luis Alejandro Zambrano Valle y Juan Norberto Pardo Robayo
 
-Estado al **6 oct 2026** (semana 9 de la guía: resultados y economía; la
-semana 10 es el cierre técnico y documental).
+Estado al **19 oct 2026**: simulación, HMI e integración cerradas; documento
+actualizado (`apartado_doc/Secado_de_cafe_19oct.docx`) y en revisión final.
 
 ## Objetivos y dónde está cada uno en el repositorio
 
 | Objetivo (literal, aprobado) | Estado | Dónde |
 |---|---|---|
-| **General:** Desarrollar un sistema de supervisión digital basado en tecnologías IoT para el análisis mediante simulación del proceso de secado de café bajo diferentes perfiles térmicos. | En cierre | Todo el repositorio |
+| **General:** Desarrollar un sistema de supervisión digital basado en tecnologías IoT para el análisis mediante simulación del proceso de secado de café bajo diferentes perfiles térmicos. | ✅ Cumplido | Todo el repositorio |
 | **1.** Modelar computacionalmente el comportamiento del proceso de secado de café, con el fin de establecer una base para la simulación y el análisis del proceso. | ✅ Cerrado y validado | `python/` (modelo), `data/reference/validacion_modelo.md` |
-| **2.** Diseñar una arquitectura de supervisión digital basada en IoT y una interfaz HMI para el monitoreo de las variables del proceso de secado. | 🟡 Funciona; falta HMI final y FluidSIM | `codesys/`, `fluidsim/`, `docs/diagrama_simulacion.png` |
+| **2.** Diseñar una arquitectura de supervisión digital basada en IoT y una interfaz HMI para el monitoreo de las variables del proceso de secado. | ✅ HMI final con selección de perfil y caudal, FluidSIM integrado | `codesys/v7/`, `fluidsim/`, `docs/diagrama_simulacion.png` |
 | **3.** Analizar distintos perfiles térmicos mediante la simulación del proceso de secado de café, analizando el comportamiento de sus variables principales. | ✅ Campaña Monte Carlo de 150 realizaciones | `python/resultados/campana/`, `figures/` |
-| **4.** Evaluar la viabilidad económica del sistema de supervisión digital para el secado de café, mediante la estimación y análisis de los costos asociados a su implementación. | 🔴 Energía lista; faltan BOM y CAPEX/OPEX | `python/balance_energia.py`, `data/reference/equipos_energia.md` |
+| **4.** Evaluar la viabilidad económica del sistema de supervisión digital para el secado de café, mediante la estimación y análisis de los costos asociados a su implementación. | ✅ BOM cotizado, CAPEX (A: 14,7 M COP; B: 20,6 M COP), OPEX y costo por kg; faltan 2 cotizaciones | `data/reference/cotizaciones_bom.md`, `python/balance_energia.py` |
 
 ## Qué se simula
 
@@ -64,9 +64,14 @@ Clima de Chinchiná ─> Python (planta: secador, lecho, cinética)  ⇄ Modbus 
 ```
 
 - **Python = servidor Modbus** (esclavo): publica temperatura, humedades,
-  caudal y estado; recibe comandos. 24 registros (`docs/tabla_variables.md`).
-- **CODESYS = cliente** (maestro): RUN/HOLD, ventilador y caudal, inversión
-  del aire cada 6 h, parada por humedad, watchdog en los dos sentidos, HMI.
+  caudal, energía y estado; recibe comandos y la consigna del perfil. 27
+  registros (`docs/tabla_variables.md`). Arranca en HOLD y congela el modelo
+  mientras el PLC no está secando.
+- **CODESYS = cliente** (maestro): máquina de estados (`SECUENCIA`), RUN/HOLD,
+  perfil térmico y caudal elegidos en la HMI, inversión del aire cada 6 h,
+  parada por humedad, watchdog en los dos sentidos, HMI y semáforo.
+- **FluidSIM (OPC):** compuerta de inversión y bandeja (cilindros, válvulas
+  5/2 biestables, finales de carrera), pulsadores y semáforo.
 - **Dos niveles de control**, como en un secador real: el termostato del ducto
   (campo) y la supervisión del proceso (PLC). Con la simulación acelerada el
   termostato corre en Python; a tiempo real lo puede cerrar el PLC.
@@ -82,8 +87,8 @@ Clima de Chinchiná ─> Python (planta: secador, lecho, cinética)  ⇄ Modbus 
 | `python/` | Modelo, servidor Modbus, campaña Monte Carlo, análisis, validación y energía. Ver `python/README.md`. |
 | `python/resultados/` | Piloto (N = 130) y campaña final (150 realizaciones) con su resumen y figuras. |
 | `python/legacy/` | Código retirado (modelos v0.1, Midilli). No se usa en los resultados. |
-| `codesys/` | `PLC_PRG_v3.st` (vigente), proyecto CODESYS SP9, evidencias y guía Modbus. Ver `codesys/README.md`. |
-| `fluidsim/` | Circuito neumático de la compuerta de inversión (en construcción). |
+| `codesys/` | Programa vigente en `v7/`, proyecto CODESYS SP9, evidencias y guía Modbus. Ver `codesys/README.md`. |
+| `fluidsim/` | Circuito electroneumático (compuerta, bandeja, pulsadores, semáforo) y su enlace OPC. |
 | `data/clima/` | Serie diaria NASA POWER 2005–2024 de Naranjal. |
 | `data/reference/` | Fuentes digitalizadas y justificación de cada parámetro (clima, secador, equipos, validación). |
 | `docs/` | Tabla de variables, evolución del modelo, selección de líneas base, diagramas. |
@@ -104,22 +109,16 @@ python modbus_server.py          # planta para CODESYS (puerto 5020)
 Herramientas: Python 3.14 (numpy, scipy, pandas, matplotlib, pymodbus 3.6.9),
 CODESYS V3.5 SP9 con CODESYS Control Win V3, FluidSIM (OPC).
 
-## Pendiente (6 oct 2026)
+## Pendiente (19 oct 2026)
 
-1. **Objetivo 4:** lista de equipos con precios (BOM), CAPEX y OPEX con la
-   tarifa de la CHEC, comparación con el secado solar.
-2. **CODESYS:** cargar `PLC_PRG_v3` con los canales de caudal, HMI final,
-   botón "Nuevo lote" con reinicio de la planta en Python y una verificación
-   a tiempo real CODESYS vs. réplica (~60 min).
-3. **FluidSIM:** compuerta de inversión (cilindro doble efecto, válvula 5/2
-   biestable, finales de carrera, alarma de compuerta trabada).
-4. **Con el asesor:** confirmar "variables activas" = manipuladas, criterio de
-   convergencia, filtro de calidad y si se hace análisis de sensibilidad
-   climática o se declara como limitación.
-5. **Documento:** sincronizar con el repositorio (metodología, tabla de
-   variables, validación, resultados), referencias (Kumar/Boyle/Zhang,
-   NTC-ISO 6673), literatura 2023–2026, justificación IoT/IIoT y conclusiones
-   por objetivo.
+1. **Repositorio:** subir el proyecto CODESYS actualizado y el circuito de
+   FluidSIM; etiquetar la versión de entrega (`git tag`).
+2. **Objetivo 4:** cotizar el transmisor de T y HR ambiente y el ventilador
+   trifásico; definir el controlador con el asesor (hoy S7-1200 de referencia).
+3. **Con el asesor:** límite de páginas de la bibliografía con APA, portada,
+   matriz de sensores de humedad y verificación a tiempo real CODESYS vs. réplica
+   (hoy declarada como limitación).
+4. **Sustentación:** presentación, banco de preguntas y ensayo de la demo.
 
 Cómo se llegó aquí y por qué se descartó cada versión anterior:
 `docs/evolucion_del_modelo.md`.

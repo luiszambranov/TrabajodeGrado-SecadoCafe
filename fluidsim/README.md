@@ -1,23 +1,23 @@
 # /fluidsim
 
-Circuito neumático de actuación (FluidSIM), conectado a CODESYS por OPC
-(prueba concurrente Modbus + OPC verificada el 23 sept 2026: GO).
+Circuito electroneumático de actuación (FluidSIM-P 4.2), conectado a CODESYS por OPC (`CoDeSys.OPC.DA`). Estado: **funcionando con la HMI final (19 oct 2026)**.
 
-## Qué se va a modelar
+## Qué contiene el circuito
 
-La **compuerta de inversión del aire** del secador: cada 6 h el aire pasa de
-subir por el lecho (abajo → arriba) a bajar (arriba → abajo), como en el
-secador estático de Cenicafé (SECAFÉ, 2008). En la simulación la orden la da
-CODESYS (`flow_dir_cmd`, registro 15) y Python cambia el sentido del aire en
-el modelo del lecho, así que la actuación modifica una variable física de la
-planta (no es una animación desconectada).
+- **Compuerta de inversión del aire** (cilindro 1, doble efecto) con válvula 5/2 biestable (bobinas 1S1/2S1) y finales de carrera 1B1 (normal) y 1B2 (invertida). El sentido del aire que recibe Python sale de 1B2, no del reloj de 6 h: si la compuerta se traba, el aire no se invierte y el PLC pasa a FALLA.
+- **Bandeja de café** (cilindro 2, doble efecto) con válvula 5/2 biestable (1S2/2S2) y finales 2B1 (afuera) y 2B2 (adentro).
+- Pulsadores EMERGENCIA (NC), START (NA) y STOP (NC); relé K1 del ventilador; semáforo verde, amarillo y rojo.
+- Unidad de mantenimiento y reguladores de caudal.
 
-Circuito previsto:
-- Cilindro de doble efecto que mueve la compuerta.
-- Válvula 5/2 biestable (mantiene la posición sin señal).
-- Dos finales de carrera (compuerta abajo / arriba) que vuelven a CODESYS.
-- Alarma "compuerta trabada" si el final de carrera no llega en un tiempo
-  máximo después de la orden.
+## Enlace OPC
 
-Estado (6 oct 2026): pendiente. Solo existe la prueba mínima de conexión
-(botón → cilindro), evidencia en `codesys/ConcexionOPC.png`.
+| Bloque FluidSIM | Variable CODESYS | Bits |
+|---|---|---|
+| FluidSIM Out | `GVL_SECUENCIA.INPUT0` | 0 EMERGENCIA, 1 START, 2 STOP, 3 1B1, 4 1B2, 5 2B1, 6 2B2 |
+| FluidSIM In | `GVL_SECUENCIA.OUTPUT0` | 0 1S1, 1 2S1, 2 1S2, 3 2S2, 4 K1, 5 verde, 6 amarillo, 7 rojo |
+
+En reposo (compuerta normal y bandeja afuera), `INPUT0` = 45: EMERGENCIA (1) + STOP (4) + 1B1 (8) + 2B1 (32). En CODESYS, `GVL_SECUENCIA.sin_fluidsim` debe estar en FALSE.
+
+Evidencia: `../codesys/evidencia_fluidsim_circuito_v7.png`.
+
+**Pendiente:** subir aquí el archivo del circuito (`.ct`).

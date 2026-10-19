@@ -11,6 +11,7 @@ generados por nuestras simulaciones).
 | `roa_cenicafe_isoterma_capa_delgada.md` | Isoterma de Roa (Trejos et al., 1989) y ecuación de capa delgada de SECAFÉ: el modelo cinético único. Erratas detectadas y verificación cruzada. |
 | `secador_electrico_dimensionamiento.md` | Dimensionamiento del secador supervisado (lote, caudal, lecho, resistencia, plenum) con fuentes. |
 | `equipos_energia.md` | Equipos comerciales (ventilador S&P, resistencias Tempco, extractor de la activa) y su consumo. Insumo del objetivo 4. |
+| `cotizaciones_bom.md` | BOM con precio, proveedor, URL y fecha de consulta (19 oct 2026), tasas de cambio, tarifa CHEC y CAPEX de los escenarios A y B. Base del capítulo IV. |
 | `chinchina_clima_fuentes.md` | Clima de Chinchiná: medias de Naranjal, horas de T mín/máx, variabilidad con NASA POWER. |
 | `validacion_modelo.md` | Validación contra 4 casos independientes (laboratorio, patio, secador Escafé, secado solar). |
 | `phitakwinai_2019_tabla2_parametros.csv` | Tabla 2 de Phitakwinai et al. (2019). La usa `python/validacion_modelo.py` (caso V1). |
