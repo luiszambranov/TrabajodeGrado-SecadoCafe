@@ -8,8 +8,8 @@ Trabajo de grado — Diplomado en Automatización Industrial, Ingeniería
 Mecatrónica, Uniagustiniana.
 **Estudiantes:** Luis Alejandro Zambrano Valle y Juan Norberto Pardo Robayo
 
-Estado al **19 oct 2026**: simulación, HMI e integración cerradas; documento
-actualizado (`apartado_doc/Secado_de_cafe_19oct.docx`) y en revisión final.
+Estado al **20 oct 2026**: simulación, HMI e integración cerradas; documento
+actualizado (`apartado_doc/Secado_de_cafe_20oct.docx`) y en revisión final.
 
 ## Objetivos y dónde está cada uno en el repositorio
 
@@ -19,7 +19,7 @@ actualizado (`apartado_doc/Secado_de_cafe_19oct.docx`) y en revisión final.
 | **1.** Modelar computacionalmente el comportamiento del proceso de secado de café, con el fin de establecer una base para la simulación y el análisis del proceso. | ✅ Cerrado y validado | `python/` (modelo), `data/reference/validacion_modelo.md` |
 | **2.** Diseñar una arquitectura de supervisión digital basada en IoT y una interfaz HMI para el monitoreo de las variables del proceso de secado. | ✅ HMI final con selección de perfil y caudal, FluidSIM integrado | `codesys/v7/`, `fluidsim/`, `docs/diagrama_simulacion.png` |
 | **3.** Analizar distintos perfiles térmicos mediante la simulación del proceso de secado de café, analizando el comportamiento de sus variables principales. | ✅ Campaña Monte Carlo de 150 realizaciones | `python/resultados/campana/`, `figures/` |
-| **4.** Evaluar la viabilidad económica del sistema de supervisión digital para el secado de café, mediante la estimación y análisis de los costos asociados a su implementación. | ✅ BOM cotizado, CAPEX (A: 14,7 M COP; B: 20,6 M COP), OPEX y costo por kg; faltan 2 cotizaciones | `data/reference/cotizaciones_bom.md`, `python/balance_energia.py` |
+| **4.** Evaluar la viabilidad económica del sistema de supervisión digital para el secado de café, mediante la estimación y análisis de los costos asociados a su implementación. | ✅ BOM cotizado y verificado con enlaces, estructura incluida, CAPEX (A: 20,3 M COP; B: 22,8 M COP), OPEX y costo por kg; falta el análisis de beneficios a 5 años | `data/reference/cotizaciones_bom.md` y `.csv`, `python/balance_energia.py` |
 
 ## Qué se simula
 
@@ -78,7 +78,8 @@ Clima de Chinchiná ─> Python (planta: secador, lecho, cinética)  ⇄ Modbus 
 - **Monte Carlo** usa una réplica en Python de la lógica del PLC sobre la misma
   física (`python/control_supervisado.py`), para correr miles de horas sin
   tiempo real.
-- Diagrama completo: `docs/diagrama_simulacion.png`.
+- Diagrama simplificado (Figura 1 del documento): `docs/diagrama_arquitectura.png`, generado con
+  `docs/diagrama_arquitectura.py`. Diagrama completo con variables y registros: `docs/diagrama_simulacion.png`.
 
 ## Estructura del repositorio
 
@@ -109,12 +110,13 @@ python modbus_server.py          # planta para CODESYS (puerto 5020)
 Herramientas: Python 3.14 (numpy, scipy, pandas, matplotlib, pymodbus 3.6.9),
 CODESYS V3.5 SP9 con CODESYS Control Win V3, FluidSIM (OPC).
 
-## Pendiente (19 oct 2026)
+## Pendiente (20 oct 2026)
 
 1. **Repositorio:** subir el proyecto CODESYS actualizado y el circuito de
    FluidSIM; etiquetar la versión de entrega (`git tag`).
-2. **Objetivo 4:** cotizar el transmisor de T y HR ambiente y el ventilador
-   trifásico; definir el controlador con el asesor (hoy S7-1200 de referencia).
+2. **Objetivo 4:** análisis de beneficios a 5 años; definir el controlador con el
+   asesor (hoy S7-1200 de referencia); confirmar con proveedores los puntos marcados
+   en `data/reference/cotizaciones_bom.md`.
 3. **Con el asesor:** límite de páginas de la bibliografía con APA, portada,
    matriz de sensores de humedad y verificación a tiempo real CODESYS vs. réplica
    (hoy declarada como limitación).
