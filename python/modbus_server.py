@@ -9,7 +9,27 @@ Trabajo de grado - Sistema de supervisión digital para el secado de café.
 (ver Guia_vigente_TG_Secado_Cafe_Pardo_Zambrano.pdf, sección 3,
 "Arquitectura modular objetivo" y "Prueba mínima del corte").
 
-Estado actual (6 oct 2026)
+Cambio del 21 oct 2026 (guía de cierre, R4): la planta NO se pausa
+--------------------------------------------------------------------
+Python representa la planta física, no una animación subordinada a
+CODESYS. Mientras el servidor esté corriendo, el tiempo físico y las
+ecuaciones avanzan SIEMPRE, con o sin CODESYS/FluidSIM:
+- RUN: integra con los comandos vigentes y los límites de actuación.
+- HOLD (REPOSO, PARO, FIN_SECADO, FALLA, EMERGENCIA en CODESYS):
+  resistencia y ventilador apagados, pero la cámara y el café siguen
+  evolucionando (enfriamiento hacia el ambiente, ciclo día/noche,
+  secado residual por tiro natural; ver secador_electrico.py).
+- Comunicación perdida: política de fallo LOCAL (planta_secado.py):
+  resistencia apagada ya, post-ventilación y luego todo apagado. La
+  física sigue; el ciclo no se bloquea esperando la red.
+- Nuevo lote: reinicia humedad, tiempo del lote y energía, pero NO
+  enfría la cámara.
+Hasta el 20 oct 2026 el bucle hacía dt = 0 en HOLD (modelo congelado).
+Relojes y estado publicados en los registros 27-39 (ver mapa).
+Registro CSV por ciclo con ``--log-csv`` (evidencia de los ensayos F1-F5
+y archivo de histórico del lote).
+
+Estado anterior (6 oct 2026)
 ---------------------------
 - La planta está detrás de una **interfaz modular** (clase ``Plant``):
   el bucle del servidor solo llama ``plant.step(...)``. La planta por
@@ -43,9 +63,11 @@ responsabilidades usando Modbus TCP como interfaz:
       para los comandos de control.
     - CODESYS = cliente Modbus TCP (master): sondea esos registros en
       su ciclo de tarea y escribe los comandos, exactamente como lo
-      haría contra un sensor/actuador Modbus real. Así, cuando se pase
-      de la planta simulada a la secadora física, el lado CODESYS casi
-      no cambia (solo se re-apunta la IP del cliente).
+      haría contra un sensor/actuador Modbus real. La interfaz facilita
+      reutilizar la lógica de CODESYS con una planta real, pero NO
+      sustituye la adaptación: adquisición, escalado y calibración de
+      sensores, adaptación de actuadores y evaluación de seguridad
+      (corregido 21 oct 2026; antes decía "solo se re-apunta la IP").
 
 Mapa de registros Modbus (holding registers, function code 03/06/16)
 ----------------------------------------------------------------------
@@ -61,7 +83,10 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
                                                            0=watchdog activado / valor seguro aplicado)
 
     8-9         M_coffee      REAL (float32)    % b.h.   Python -> CODESYS (v2, ver planta_secado.py)
-    10-11       tiempo_proceso_h REAL (float32) h         Python -> CODESYS (v2, horas de MODELO)
+    10-11       tiempo_proceso_h REAL (float32) h         Python -> CODESYS: horas de MODELO en RUN con
+                                                           ventilador (secado + inversión + enfriamiento)
+                                                           del lote actual. CODESYS lo usa para la
+                                                           inversión cada 6 h y el enfriamiento.
     12          heartbeat     WORD (0-65535)    -        Python -> CODESYS (contador que se
                                                            incrementa cada ciclo del servidor;
                                                            ver "Señal de latido" más abajo)
@@ -96,6 +121,24 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
                                                            térmico elegido en la HMI (REF 50, P1 45,
                                                            P2 55->35, P3 35->55). La usa el termostato
                                                            local. 0 = no configurado -> 50 °C.
+
+    Relojes y estado (21 oct 2026), todos Python -> CODESYS, horas de MODELO:
+    27-28       tiempo_lote_h   REAL  h      desde el último "Nuevo lote"; incluye paradas
+    29-30       tiempo_secado_h REAL  h      horas con calentamiento permitido (secado efectivo)
+    31-32       tiempo_parado_h REAL  h      tiempo_lote_h - tiempo_proceso_h (paro, falla, fin)
+    33-34       tiempo_planta_h REAL  h      desde que arrancó el servidor; nunca se reinicia
+    35          estado_planta   WORD  -      0=REPOSO, 1=SECANDO, 2=VENTILANDO (sin calor),
+                                             3=POST-VENTILACION (comm perdida), 4=FALLA_COMM
+    36-37       T_ambiente      REAL  °C     temperatura exterior (clima de Chinchiná)
+    38-39       hora_dia        REAL  h      hora del día 0-24 del reloj de la planta (día/noche)
+    40          fluidsim_estado WORD  -      CODESYS -> Python: salud del enlace OPC con FluidSIM
+                                             (guía de cierre, ensayo F2). 0 = no informado
+                                             (CODESYS sin el canal), 1 = FluidSIM vivo (pulso de
+                                             vida en INPUT0.7), 2 = modo sin_fluidsim DECLARADO
+                                             (actuadores emulados por el PLC), 3 = enlace caído.
+                                             Con 3, Python marca los datos de actuación como no
+                                             válidos: conserva el último sentido de aire válido
+                                             (no inventa confirmaciones de posición) y lo registra.
 
     RH_ambient vs RH_process (separados el 29 sept 2026)
     ------------------------------------------------------
@@ -145,17 +188,18 @@ operar:
 
     - 0 = RUN: la planta responde normalmente a heater_cmd/fan_cmd.
     - 1 = HOLD: la planta ignora heater_cmd/fan_cmd (los trata como 0)
-      y se limita a enfriarse/relajarse hacia el ambiente. Pensado para
-      que CODESYS pueda forzar un estado seguro conocido sin tener que
-      dejar de escribir en el registro.
+      y se enfría hacia el ambiente. La física NO se congela (21 oct
+      2026): el tiempo, el clima y el café siguen evolucionando.
 
 Independientemente de lo que escriba CODESYS, el servidor tiene un
 **watchdog**: si no recibe ninguna escritura en heater_cmd, fan_cmd o
 plant_mode durante más de ``WATCHDOG_TIMEOUT_S`` segundos, asume que la
 comunicación con CODESYS se perdió (o que CODESYS está detenido) y:
 
-    1. Fuerza heater_cmd y fan_cmd efectivos a 0 (valor seguro) para el
-       cálculo de la planta, sin necesidad de que nadie los escriba.
+    1. Aplica la política de fallo local (planta_secado.py): resistencia
+       apagada de inmediato aunque haya una consigna vieja, ventilador en
+       post-ventilación (``--post-ventilacion-min``) y luego apagado. La
+       planta sigue integrando.
     2. Publica ``safety_ok = 0`` para que CODESYS (o cualquier cliente
        Modbus) pueda mostrar una alarma de "comunicación perdida".
 
@@ -233,7 +277,17 @@ REG_RESET_LOTE_CMD = 21  # 1 registro: flanco 0->1 = nuevo lote (CODESYS -> Pyth
 REG_CAUDAL = 22        # 2 registros: float32, caudal real [m3/min] (Python -> CODESYS, 5 oct 2026)
 REG_ENERGIA = 24       # 2 registros: float32, energía eléctrica del lote [kWh] (Python -> CODESYS, 14 oct 2026)
 REG_SETPOINT_CMD = 26  # 1 registro: consigna de T_process en °C enteros (CODESYS -> Python, 19 oct 2026)
-NUM_HOLDING_REGS = 27  # 0-26 (19 oct 2026: consigna del perfil térmico)
+# 21 oct 2026: relojes y estado de la planta (Python -> CODESYS)
+REG_TIEMPO_LOTE = 27     # 2 registros: float32 [h de modelo] desde "Nuevo lote", incluye paradas
+REG_TIEMPO_SECADO = 29   # 2 registros: float32 [h] con calentamiento permitido
+REG_TIEMPO_PARADO = 31   # 2 registros: float32 [h] lote - proceso
+REG_TIEMPO_PLANTA = 33   # 2 registros: float32 [h] desde que arrancó el servidor
+REG_ESTADO_PLANTA = 35   # 1 registro: 0 REPOSO, 1 SECANDO, 2 VENTILANDO, 3 POST-VENT, 4 FALLA_COMM
+REG_T_AMBIENTE = 36      # 2 registros: float32 [°C]
+REG_HORA_DIA = 38        # 2 registros: float32 [h, 0-24]
+REG_FLUIDSIM_ESTADO = 40 # 1 registro: 0 no informado, 1 vivo, 2 sin_fluidsim declarado, 3 caído (CODESYS -> Python)
+NUM_HOLDING_REGS = 41    # 0-40 (21 oct 2026)
+FLUIDSIM_TXT = {0: "no informado", 1: "vivo", 2: "SIN_FLUIDSIM (emulado)", 3: "CAIDO"}
 
 HEARTBEAT_MAX = 0xFFFF  # 16 bits; el contador da la vuelta a 0 al llegar aquí
 
@@ -303,6 +357,7 @@ class PlantInputs:
     flow_dir_cmd: int = 0  # 0 = aire de abajo hacia arriba, 1 = invertido
     fan_speed_pct: int = 0  # consigna de caudal 0-100 % (0 = no configurado -> 100 %)
     setpoint_c: float = 0.0  # consigna de T_process desde el PLC (0 = no configurado -> valor por defecto)
+    fluidsim_estado: int = 0  # registro 40 (21 oct 2026): 0 no informado, 1 vivo, 2 emulado, 3 caído
 
 
 @dataclass
@@ -335,6 +390,21 @@ class PlantOutputs:
     # Humedad de la capa más húmeda del lecho [% b.h.] -- 16-17. None -> ToyPlant.
     # HR del aire DENTRO de la cámara [%] -- direcciones 13-14 (29 sept
     # 2026). rh_ambient_pct es SOLO la HR exterior. None -> ToyPlant.
+    # --- 21 oct 2026: relojes, estado y variables para el registro CSV ---
+    t_ambiente_c: float | None = None
+    hora_dia_h: float | None = None
+    t_planta_h: float | None = None
+    t_lote_h: float | None = None
+    t_secado_h: float | None = None
+    t_parado_h: float | None = None
+    estado_planta: int | None = None
+    m_coffee_min_pct: float | None = None
+    potencia_res_kw: float | None = None
+    caudal_natural_m3_min: float | None = None
+    setpoint_aplicado_c: float | None = None
+    fan_cmd_aplicado: int | None = None
+    heater_permiso: int | None = None
+    flujo_invertido_aplicado: int | None = None
 
 
 class Plant(abc.ABC):
@@ -427,6 +497,58 @@ def _sin_aprox(x: float) -> float:
     return math.sin(x)
 
 
+class RegistroCSV:
+    """Una fila por ciclo del servidor (21 oct 2026). Sirve como evidencia de
+    los ensayos de fallo F1-F5 (guía de cierre, R4) y como archivo de
+    histórico del lote completo (R5): tiempo de reloj y de modelo, estado,
+    salud del enlace, edad de comandos, comandos recibidos y aplicados,
+    clima, proceso, humedad, potencia y energía."""
+
+    COLUMNAS = [
+        "reloj_iso", "reloj_s", "t_planta_h", "hora_dia_h", "t_lote_h", "t_proceso_h", "t_secado_h",
+        "t_parado_h", "estado_planta", "plant_mode", "comm_lost", "edad_comandos_s", "heartbeat",
+        "heater_cmd_rx", "fan_cmd_rx", "fan_speed_rx", "setpoint_rx", "flow_dir_rx", "fluidsim_estado",
+        "flujo_invertido_aplicado",
+        "fan_aplicado", "heater_permiso", "setpoint_aplicado_c",
+        "T_ambiente_c", "RH_ambiente_pct", "T_process_c", "RH_process_pct",
+        "M_prom_bh", "M_max_bh", "M_min_bh", "potencia_res_kw", "duty_pct",
+        "caudal_m3_min", "caudal_natural_m3_min", "energia_kwh",
+    ]
+
+    def __init__(self, ruta: str) -> None:
+        import csv
+        import os
+        nuevo = not os.path.exists(ruta)
+        self._f = open(ruta, "a", newline="", encoding="utf-8")
+        self._w = csv.writer(self._f)
+        if nuevo:
+            self._w.writerow(self.COLUMNAS)
+        self._t0 = time.time()
+
+    def escribir(self, o: "PlantOutputs", **k) -> None:
+        from datetime import datetime
+
+        def f(v, nd=4):
+            return "" if v is None else (round(v, nd) if isinstance(v, float) else v)
+
+        self._w.writerow([
+            datetime.now().isoformat(timespec="milliseconds"), round(time.time() - self._t0, 3),
+            f(o.t_planta_h), f(o.hora_dia_h), f(o.t_lote_h), f(o.tiempo_proceso_h), f(o.t_secado_h),
+            f(o.t_parado_h), f(o.estado_planta), k["plant_mode"], int(k["comm_lost"]),
+            round(k["edad_comandos_s"], 2), k["heartbeat"],
+            k["heater_cmd"], k["fan_cmd"], k["fan_speed_pct"], k["setpoint_cmd"], k["flow_dir_cmd"],
+            k["fluidsim_estado"], f(o.flujo_invertido_aplicado),
+            f(o.fan_cmd_aplicado), f(o.heater_permiso), f(o.setpoint_aplicado_c),
+            f(o.t_ambiente_c), f(o.rh_ambient_pct), f(o.t_process_c), f(o.rh_process_pct),
+            f(o.m_coffee_pct), f(o.m_coffee_max_pct), f(o.m_coffee_min_pct), f(o.potencia_res_kw),
+            f(o.heater_duty_pct), f(o.caudal_m3_min), f(o.caudal_natural_m3_min), f(o.energia_kwh),
+        ])
+        self._f.flush()
+
+    def cerrar(self) -> None:
+        self._f.close()
+
+
 def construir_contexto() -> tuple[ModbusServerContext, WatchedDataBlock]:
     hr_block = WatchedDataBlock(0, [0] * NUM_HOLDING_REGS)
     slave_ctx = ModbusSlaveContext(hr=hr_block, zero_mode=True)
@@ -464,6 +586,7 @@ def bucle_planta(
     watched_block: WatchedDataBlock,
     stop_event: threading.Event,
     periodo_s: float,
+    registro_csv: "RegistroCSV | None" = None,
 ) -> None:
     """Lee comandos, aplica el watchdog de comunicación, avanza la planta
     (a través de la interfaz ``Plant``, ver más arriba) y publica el
@@ -471,6 +594,7 @@ def bucle_planta(
 
     heartbeat = 0
     reset_anterior = 0
+    fluidsim_previo = 0
     while not stop_event.is_set():
         # "Nuevo lote" (registro 21): se actúa en el FLANCO 0 -> 1, porque
         # CODESYS escribe el registro en cada ciclo; mientras siga en 1 no
@@ -487,20 +611,28 @@ def bucle_planta(
         flow_dir_bruto = slave_ctx.getValues(3, REG_FLOW_DIR_CMD, count=1)[0]
         fan_speed_bruto = slave_ctx.getValues(3, REG_FAN_SPEED_CMD, count=1)[0]
         setpoint_bruto = slave_ctx.getValues(3, REG_SETPOINT_CMD, count=1)[0]
+        fluidsim_estado = slave_ctx.getValues(3, REG_FLUIDSIM_ESTADO, count=1)[0]
+        if fluidsim_estado != fluidsim_previo:
+            log.warning("Enlace FluidSIM: %s -> %s", FLUIDSIM_TXT.get(fluidsim_previo, "?"),
+                        FLUIDSIM_TXT.get(fluidsim_estado, "?"))
+            fluidsim_previo = fluidsim_estado
 
         comm_lost = watched_block.seconds_since_last_actuator_write() > WATCHDOG_TIMEOUT_S
         heater_cmd = 0 if comm_lost else heater_cmd_bruto
         fan_cmd = 0 if comm_lost else fan_cmd_bruto
 
-        # 19 oct 2026: en HOLD (REPOSO, PARO, FIN_SECADO en CODESYS) el
-        # modelo se CONGELA (paso de 0 s): no avanzan el tiempo de proceso,
-        # la humedad del cafe ni la energia. El secado solo corre tras START.
-        dt_paso_s = 0.0 if plant_mode == PLANT_MODE_HOLD else periodo_s
+        # 21 oct 2026: la planta NUNCA se congela. HOLD y comm_lost solo
+        # cambian los comandos (ver planta_secado.ModeloSecadoPlant.step);
+        # el tiempo físico avanza siempre ``periodo_s`` por ciclo.
+        # (Hasta el 20 oct: dt = 0 en HOLD, modelo congelado.)
+        dt_paso_s = periodo_s
+        edad_comandos_s = watched_block.seconds_since_last_actuator_write()
         outputs = plant.step(
             dt_paso_s,
             PlantInputs(heater_cmd=heater_cmd, fan_cmd=fan_cmd, plant_mode=plant_mode, comm_lost=comm_lost,
                         flow_dir_cmd=0 if comm_lost else flow_dir_bruto,
-                        fan_speed_pct=fan_speed_bruto, setpoint_c=float(setpoint_bruto)),
+                        fan_speed_pct=fan_speed_bruto, setpoint_c=float(setpoint_bruto),
+                        fluidsim_estado=fluidsim_estado),
         )
 
         slave_ctx.setValues(3, REG_T_PROCESS, float_to_registers(outputs.t_process_c))
@@ -520,6 +652,13 @@ def bucle_planta(
             slave_ctx.setValues(3, REG_CAUDAL, float_to_registers(outputs.caudal_m3_min))
         if outputs.energia_kwh is not None:
             slave_ctx.setValues(3, REG_ENERGIA, float_to_registers(outputs.energia_kwh))
+        for reg, val in ((REG_TIEMPO_LOTE, outputs.t_lote_h), (REG_TIEMPO_SECADO, outputs.t_secado_h),
+                         (REG_TIEMPO_PARADO, outputs.t_parado_h), (REG_TIEMPO_PLANTA, outputs.t_planta_h),
+                         (REG_T_AMBIENTE, outputs.t_ambiente_c), (REG_HORA_DIA, outputs.hora_dia_h)):
+            if val is not None:
+                slave_ctx.setValues(3, reg, float_to_registers(val))
+        if outputs.estado_planta is not None:
+            slave_ctx.setValues(3, REG_ESTADO_PLANTA, [int(outputs.estado_planta)])
 
         # Heartbeat: se incrementa y publica SIEMPRE, incluso con
         # comm_lost=True -- es la señal de "el proceso Python sigue
@@ -528,7 +667,19 @@ def bucle_planta(
         heartbeat = (heartbeat + 1) % (HEARTBEAT_MAX + 1)
         slave_ctx.setValues(3, REG_HEARTBEAT, [heartbeat])
 
-        estado = "COMM_LOST(valor seguro)" if comm_lost else "OK"
+        if registro_csv is not None:
+            registro_csv.escribir(outputs, plant_mode=plant_mode, comm_lost=comm_lost,
+                                  edad_comandos_s=edad_comandos_s, heater_cmd=heater_cmd_bruto,
+                                  fan_cmd=fan_cmd_bruto, fan_speed_pct=fan_speed_bruto,
+                                  setpoint_cmd=setpoint_bruto, flow_dir_cmd=flow_dir_bruto,
+                                  heartbeat=heartbeat, fluidsim_estado=fluidsim_estado)
+
+        estado = "COMM_LOST(politica de fallo)" if comm_lost else "OK"
+        if outputs.t_planta_h is not None:
+            from planta_secado import ESTADOS_TXT
+            log.info("planta=%6.2fh lote=%6.2fh secado=%6.2fh parado=%6.2fh hora=%5.2f T_amb=%5.1fC estado=%s",
+                     outputs.t_planta_h, outputs.t_lote_h, outputs.t_secado_h, outputs.t_parado_h,
+                     outputs.hora_dia_h, outputs.t_ambiente_c, ESTADOS_TXT.get(outputs.estado_planta, "?"))
         m_coffee_str = f"{outputs.m_coffee_pct:5.1f}%" if outputs.m_coffee_pct is not None else "  n/a"
         tiempo_str = f"{outputs.tiempo_proceso_h:6.2f}h" if outputs.tiempo_proceso_h is not None else "    n/a"
         rh_proc_str = f"{outputs.rh_process_pct:5.1f}%" if outputs.rh_process_pct is not None else "  n/a"
@@ -596,6 +747,15 @@ def main() -> None:
     )
     parser.add_argument("--setpoint", type=float, default=50.0,
                         help="Solo con --lazo-termico local: setpoint del termostato del ducto [C] (default 50)")
+    parser.add_argument("--hora-inicio", type=float, default=0.0,
+                        help="Hora del día (0-24) en que arranca la planta; el clima sigue el ciclo día/noche "
+                             "desde ahí (default 0 = medianoche, igual que la campaña Monte Carlo)")
+    parser.add_argument("--post-ventilacion-min", type=float, default=10.0,
+                        help="Minutos de MODELO de post-ventilación al perder la comunicación (resistencia ya "
+                             "apagada); 0 = todo apagado de inmediato (default 10)")
+    parser.add_argument("--log-csv", default=None,
+                        help="Ruta de un CSV con una fila por ciclo (relojes, estado, enlaces, comandos, "
+                             "T, HR, humedad, potencia, energía). Evidencia de los ensayos F1-F5.")
     args = parser.parse_args()
     WATCHDOG_TIMEOUT_S = args.watchdog_timeout
 
@@ -611,6 +771,8 @@ def main() -> None:
                 factor_aceleracion=args.factor_aceleracion,
                 lazo_termico=args.lazo_termico,
                 setpoint_c=args.setpoint,
+                hora_inicio_h=args.hora_inicio,
+                post_ventilacion_h=args.post_ventilacion_min / 60.0,
             ),
             periodo_s=args.periodo,
         )
@@ -621,10 +783,13 @@ def main() -> None:
     else:
         plant: Plant = ToyPlant()
     stop_event = threading.Event()
+    registro_csv = RegistroCSV(args.log_csv) if args.log_csv else None
+    if registro_csv:
+        log.info("Registro CSV por ciclo en %s", args.log_csv)
 
     hilo_planta = threading.Thread(
         target=bucle_planta,
-        args=(plant, context[0], watched_block, stop_event, args.periodo),
+        args=(plant, context[0], watched_block, stop_event, args.periodo, registro_csv),
         daemon=True,
     )
     hilo_planta.start()
@@ -635,7 +800,9 @@ def main() -> None:
         "hr[4-5]=RH_ambient | hr[6]=plant_mode | hr[7]=safety_ok | hr[8-9]=M_coffee (v2) | "
         "hr[10-11]=tiempo_proceso_h (v2) | hr[12]=heartbeat (v2) | hr[13-14]=RH_process | "
         "hr[15]=flow_dir_cmd | hr[16-17]=M_coffee_max | hr[18-19]=heater_duty | "
-        "hr[20]=fan_speed_pct | hr[21]=reset_lote_cmd | hr[22-23]=caudal | hr[24-25]=energia_kWh | hr[26]=setpoint_cmd"
+        "hr[20]=fan_speed_pct | hr[21]=reset_lote_cmd | hr[22-23]=caudal | hr[24-25]=energia_kWh | hr[26]=setpoint_cmd | "
+        "hr[27-28]=tiempo_lote_h | hr[29-30]=tiempo_secado_h | hr[31-32]=tiempo_parado_h | hr[33-34]=tiempo_planta_h | "
+        "hr[35]=estado_planta | hr[36-37]=T_ambiente | hr[38-39]=hora_dia | hr[40]=fluidsim_estado"
     )
     log.info("Watchdog de comunicación (CODESYS->Python): %.1f s sin escritura de actuadores => valor seguro.", WATCHDOG_TIMEOUT_S)
     log.info("Heartbeat (Python->CODESYS): hr[12] se incrementa cada ciclo; si CODESYS lo ve congelado, el servidor Python se cayó.")
@@ -654,6 +821,8 @@ def main() -> None:
     finally:
         stop_event.set()
         hilo_planta.join(timeout=2)
+        if registro_csv:
+            registro_csv.cerrar()
 
 
 if __name__ == "__main__":

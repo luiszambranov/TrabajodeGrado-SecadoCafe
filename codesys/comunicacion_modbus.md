@@ -218,9 +218,14 @@ estos tres puntos fueron el 90% del tiempo perdido la primera vez:
 | **CODESYS** | Cliente / *master* TCP | Sondea las variables en su ciclo de tarea y escribe los comandos — igual que lo haría contra un sensor/actuador Modbus real. |
 
 Esto respeta el reparto de capas de la guía (CODESYS = Controlador,
-Python = Planta) y hace que, cuando se pase de la planta simulada a la
-secadora física, en CODESYS solo haya que cambiar la IP del dispositivo
-esclavo, no la arquitectura.
+Python = Planta) y facilita reutilizar la lógica de CODESYS con una
+secadora física. Eso NO significa que baste con cambiar la IP: una planta
+real exige adquisición, escalado y calibración de sensores, adaptación de
+actuadores y evaluación de seguridad (corregido el 21 oct 2026).
+
+Nota 21 oct 2026: la planta Python ya no se congela en HOLD; los registros
+27–39 (relojes y estado) están en `docs/tabla_variables.md` y en el
+docstring de `python/modbus_server.py`.
 
 ## 2. Mapa de registros (v1)
 

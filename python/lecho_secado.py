@@ -38,9 +38,16 @@ escritas en SI)
     de Thompson: el aire no puede cargar más agua que la de saturación).
  7. Grano y aire salen a Tf; el aire (Tf, w+Δw) entra a la capa siguiente.
 
-Con el ventilador apagado no hay flujo: el lecho no seca ni se
-rehumedece (la humedad se conserva) y su temperatura no cambia en este
-modelo (simplificación: pausas cortas).
+Con el ventilador apagado (21 oct 2026, ``paso_reposo``): el lecho NO se
+congela. (a) Pierde calor por sus superficies hacia el ambiente por
+convección natural (UA = h_conv_natural * area_perdidas_lecho, repartido
+por igual entre capas: simplificación declarada); (b) lo atraviesa el
+pequeño caudal de tiro natural (efecto chimenea, dinamica_termica.
+masa_aire_tiro_natural_kg_s) con el mismo algoritmo de Thompson, así que
+sigue secándose un poco con el calor que conserva (o se rehumedece si el
+aire está más húmedo que su equilibrio), y el aire no puede salir
+sobresaturado. Antes (hasta el 20 oct 2026) el lecho quedaba congelado.
+Ficha: data/reference/reposo_tiro_natural.md.
 
 Referencias
 ------------
@@ -168,6 +175,46 @@ class LechoThompson:
                 agua += dagua
                 fuera |= r.fuera_de_rango
                 rehum |= r.rehumectacion
+            t_max = max(t_max, float(self.t_grano.max()))
+        return ResultadoPasoLecho(self.m_bh_promedio, t_a, w, agua, t_max, fuera, rehum)
+
+    def paso_reposo(self, t_entrada_c: float, ea_entrada_kpa: float, dt_h: float,
+                    m_aire_natural_kg_s: float, t_ambiente_c: float) -> ResultadoPasoLecho:
+        """Avanza el lecho ``dt_h`` horas con el ventilador APAGADO.
+
+        1. Pérdidas por convección natural de cada capa hacia ``t_ambiente_c``
+           (integración exacta de primer orden con la capacidad térmica de la
+           capa: materia seca + agua, Montoya 1989).
+        2. Si hay tiro natural (``m_aire_natural_kg_s`` > 0), el aire del
+           plenum sube por el lecho (sentido normal, de la capa 0 hacia
+           arriba) y se aplica el mismo balance de Thompson que con
+           ventilador: secado residual limitado por la saturación del aire.
+        """
+        from dinamica_termica import razon_humedad
+
+        if dt_h <= 0:
+            return ResultadoPasoLecho(self.m_bh_promedio, t_entrada_c, razon_humedad(ea_entrada_kpa),
+                                      0.0, float(self.t_grano.max()), False, False)
+        ua_capa_kw_k = self.p.h_conv_natural_w_m2k * self.p.area_perdidas_lecho_m2 / 1000.0 / self.n_capas
+        n_sub = max(1, int(np.ceil(dt_h / DT_MAX_H)))
+        h = dt_h / n_sub
+        agua = 0.0
+        fuera = rehum = False
+        t_max = -1e9
+        t_a, w = t_entrada_c, razon_humedad(ea_entrada_kpa)
+        for _ in range(n_sub):
+            for i in range(self.n_capas):
+                c_capa = self.masa_ms_capa * calor_especifico_cafe(self.m_bs[i] / 100.0)  # kJ/K
+                self.t_grano[i] = t_ambiente_c + (self.t_grano[i] - t_ambiente_c) * np.exp(
+                    -ua_capa_kw_k * h * 3600.0 / c_capa)
+            t_a, w = t_entrada_c, razon_humedad(ea_entrada_kpa)
+            m_aire = m_aire_natural_kg_s * h * 3600.0
+            if m_aire > 1e-9:
+                for i in range(self.n_capas):
+                    t_a, w, dagua, r = self._capa(i, t_a, w, h, m_aire)
+                    agua += dagua
+                    fuera |= r.fuera_de_rango
+                    rehum |= r.rehumectacion
             t_max = max(t_max, float(self.t_grano.max()))
         return ResultadoPasoLecho(self.m_bh_promedio, t_a, w, agua, t_max, fuera, rehum)
 

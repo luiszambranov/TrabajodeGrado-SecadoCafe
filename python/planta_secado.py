@@ -133,6 +133,25 @@ class ParametrosModeloSecadoPlant:
     histeresis_c: float = 0.0         # igual a control_supervisado.ParametrosControl
     dt_lecho_h: float = 1.0 / 60.0    # sub-paso del lecho: 1 min (igual a la replica)
     dt_ciclo_s: float = 1.0           # ciclo del termostato local [s de modelo]
+    hora_inicio_h: float = 0.0
+    """Hora del día (0-24) en que arranca la planta (21 oct 2026). 0 =
+    medianoche, igual que la campaña Monte Carlo (necesario para comparar
+    CODESYS contra la réplica con la misma semilla)."""
+    post_ventilacion_h: float = 10.0 / 60.0
+    """Política de fallo local (21 oct 2026): al perder la comunicación con
+    CODESYS la resistencia se apaga de inmediato y el ventilador, si venía
+    encendido, sigue este tiempo de MODELO para evacuar el calor del ducto
+    (práctica de post-ventilación de calentadores de ducto; criterio propio
+    declarado) y luego se apaga. 0 = todo apagado de inmediato."""
+
+
+# Estado de la planta publicado a CODESYS (registro 35, 21 oct 2026)
+ESTADO_REPOSO = 0        # HOLD: ventilador y resistencia apagados (la física sigue)
+ESTADO_SECANDO = 1       # RUN con calentamiento permitido (SECADO / INVERSION)
+ESTADO_VENTILANDO = 2    # RUN sin calentamiento (ENFRIAMIENTO)
+ESTADO_POST_VENT = 3     # comunicación perdida: post-ventilación de seguridad
+ESTADO_FALLA_COMM = 4    # comunicación perdida: todo apagado
+ESTADOS_TXT = {0: "REPOSO", 1: "SECANDO", 2: "VENTILANDO", 3: "POST-VENTILACION", 4: "FALLA_COMM"}
 
 
 class ModeloSecadoPlant(Plant):
@@ -141,22 +160,53 @@ class ModeloSecadoPlant(Plant):
     Toda la fisica esta en secador_electrico.SecadorElectrico; esta clase
     solo traduce comandos Modbus (heater_cmd, fan_cmd, plant_mode) y
     publica las salidas.
+
+    21 oct 2026 (guía de cierre, R4): la planta NUNCA se congela. Con
+    HOLD, fin de secado o comunicación perdida solo cambian los comandos
+    (resistencia apagada, ventilador según la política de fallo); el
+    tiempo físico, el clima día/noche, el enfriamiento y el secado
+    residual siguen. Relojes que lleva:
+        t_planta_h   desde que arrancó la planta (servidor); nunca se reinicia
+        t_lote_h     desde el último "Nuevo lote"; incluye paradas
+        t_proceso_h  horas en RUN con ventilador (secado + inversión +
+                     enfriamiento); es el registro 10 que usa CODESYS para
+                     la inversión cada 6 h y el enfriamiento
+        t_secado_h   horas con calentamiento permitido (secado efectivo)
+        t_parado_h   = t_lote_h - t_proceso_h (paradas, fallas, fin, reposo)
     """
 
     def __init__(self, params: Optional[ParametrosModeloSecadoPlant] = None, periodo_s: float = 1.0) -> None:
         self.params = params or ParametrosModeloSecadoPlant()
-        self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
+        self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct,
+                                        t_inicio_h=self.params.hora_inicio_h)
         self._heater_on = 0
         self._sp_plc_c = 0.0   # consigna recibida del PLC (19 oct 2026); 0 = usar params.setpoint_c
         self.modo_lazo = self._resolver_modo(periodo_s)
+        self.t_planta_h = 0.0
+        self.t_proceso_h = 0.0
+        self.t_secado_h = 0.0
+        self._fan_previo = 0
+        self._fan_frac_previa = 1.0
+        self._t_post_vent_h = 0.0   # tiempo transcurrido de post-ventilación
+        self.estado_planta = ESTADO_REPOSO
+        self._flujo_inv_valido = False   # último sentido de aire con enlace FluidSIM válido
+
+    @property
+    def t_lote_h(self) -> float:
+        return self.secador.t_h
+
+    @property
+    def t_parado_h(self) -> float:
+        return max(0.0, self.t_lote_h - self.t_proceso_h)
 
     def reset_lote(self) -> None:
-        """Nuevo lote (registro 21): secador nuevo con la humedad inicial,
-        tiempo de proceso y contadores de energía en cero. Mismo clima y
-        parámetros (14 oct 2026)."""
-        self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct)
+        """Nuevo lote (registro 21): café nuevo con la humedad inicial y
+        tiempos de lote/energía en cero. La cámara conserva su temperatura
+        y el reloj de la planta y el clima siguen (21 oct 2026)."""
+        self.secador.nuevo_lote(self.params.m0_bh_pct)
         self._heater_on = 0
-
+        self.t_proceso_h = 0.0
+        self.t_secado_h = 0.0
     def _resolver_modo(self, periodo_s: float) -> str:
         modo = self.params.lazo_termico
         tau_s = constante_tiempo_plenum_s(self.params.secador)
@@ -192,33 +242,73 @@ class ModeloSecadoPlant(Plant):
 
     def step(self, dt_s: float, inputs: PlantInputs) -> PlantOutputs:
         dt_h = (dt_s / 3600.0) * self.params.factor_aceleracion
-        self._sp_plc_c = inputs.setpoint_c
+        if inputs.setpoint_c > 0:
+            self._sp_plc_c = inputs.setpoint_c
 
-        # HOLD explicito de CODESYS tambien fuerza heater/fan a 0 (mismo
-        # criterio que ToyPlant; comm_lost ya viene resuelto por el
-        # watchdog de modbus_server.py).
-        hold = inputs.plant_mode == PLANT_MODE_HOLD
-        heater_cmd = 0 if hold else inputs.heater_cmd
-        fan_cmd = 0 if hold else inputs.fan_cmd
-        flujo_invertido = bool(inputs.flow_dir_cmd) and not hold
+        run = inputs.plant_mode != PLANT_MODE_HOLD
         # Manipulada 2 (5 oct 2026): 0 = CODESYS no la configura -> 100 %.
         fan_frac = inputs.fan_speed_pct / 100.0 if inputs.fan_speed_pct > 0 else 1.0
 
+        if inputs.comm_lost:
+            # Política de fallo LOCAL: no depende de la red. Resistencia
+            # apagada ya; ventilador en post-ventilación si venía encendido.
+            heater_cmd = 0
+            permiso_calor = False
+            if self._fan_previo and self._t_post_vent_h < self.params.post_ventilacion_h:
+                fan_cmd, fan_frac = 1, self._fan_frac_previa
+                self._t_post_vent_h += dt_h
+                self.estado_planta = ESTADO_POST_VENT
+            else:
+                fan_cmd = 0
+                self._fan_previo = 0
+                self.estado_planta = ESTADO_FALLA_COMM
+            flujo_invertido = False
+        else:
+            self._t_post_vent_h = 0.0
+            fan_cmd = inputs.fan_cmd if run else 0
+            heater_cmd = inputs.heater_cmd if run else 0
+            # En lazo local heater_cmd de CODESYS es el PERMISO de calentar
+            # (en_marcha AND calentar): en ENFRIAMIENTO el ventilador sigue
+            # pero la resistencia no puede encender (corregido 21 oct 2026;
+            # antes el termostato local calentaba también en ENFRIAMIENTO).
+            permiso_calor = bool(run and fan_cmd and inputs.heater_cmd)
+            flujo_invertido = bool(inputs.flow_dir_cmd) and run
+            # Ensayo F2 (21 oct 2026): con el enlace FluidSIM caído (registro
+            # 40 = 3) el sentido que llega no está confirmado por un final de
+            # carrera vivo: se conserva el último válido y no se inventa uno.
+            if inputs.fluidsim_estado == 3:
+                flujo_invertido = self._flujo_inv_valido and run
+            else:
+                self._flujo_inv_valido = bool(inputs.flow_dir_cmd)
+            if not run or not fan_cmd:
+                self.estado_planta = ESTADO_REPOSO
+            else:
+                self.estado_planta = ESTADO_SECANDO if permiso_calor else ESTADO_VENTILANDO
+            self._fan_previo = fan_cmd
+            self._fan_frac_previa = fan_frac
+
         # Sub-pasos del lecho de <= dt_lecho_h (1 min), igual que la replica.
-        n = max(1, int(round(dt_h / self.params.dt_lecho_h)))
-        h = dt_h / n
+        # La física avanza SIEMPRE (también con ventilador apagado).
+        n = max(1, int(round(dt_h / self.params.dt_lecho_h))) if dt_h > 0 else 0
+        h = dt_h / n if n else 0.0
         e_res0 = self.secador.c.energia_resistencia_kwh
+        e = None
         if self.modo_lazo == "local":
-            # Habilitacion de la resistencia: RUN y ventilador (el
-            # enclavamiento heater AND fan lo aplica paso_plenum).
-            habilitado = (not hold) and bool(fan_cmd)
-            control = self._termostato if habilitado else (lambda _t: 0)
+            control = self._termostato if permiso_calor else (lambda _t: 0)
             for _ in range(n):
                 e = self.secador.paso(0, fan_cmd, h, control=control, dt_ciclo_s=self.params.dt_ciclo_s,
                                       flujo_invertido=flujo_invertido, fan_frac=fan_frac)
         else:
             for _ in range(n):
                 e = self.secador.paso(heater_cmd, fan_cmd, h, flujo_invertido=flujo_invertido, fan_frac=fan_frac)
+        if e is None:
+            e = self.secador.estado()
+
+        self.t_planta_h += dt_h
+        if run and fan_cmd and not inputs.comm_lost:
+            self.t_proceso_h += dt_h
+            if permiso_calor:
+                self.t_secado_h += dt_h
 
         p_kw = self.params.secador.potencia_resistencia_kw
         e_res = self.secador.c.energia_resistencia_kwh - e_res0
@@ -227,14 +317,27 @@ class ModeloSecadoPlant(Plant):
             t_process_c=e.t_process_c,
             rh_ambient_pct=e.rh_ambiente_pct,
             m_coffee_pct=e.m_coffee_bh_pct,
-            tiempo_proceso_h=e.t_h,
+            tiempo_proceso_h=self.t_proceso_h,
             rh_process_pct=e.rh_process_pct,
             m_coffee_max_pct=e.m_capa_max_bh_pct,
             heater_duty_pct=duty,
             caudal_m3_min=e.caudal_m3_min,
             energia_kwh=self.secador.c.energia_electrica_kwh,
+            t_ambiente_c=e.t_ambiente_c,
+            hora_dia_h=e.t_fisico_h % 24.0,
+            t_planta_h=self.t_planta_h,
+            t_lote_h=self.t_lote_h,
+            t_secado_h=self.t_secado_h,
+            t_parado_h=self.t_parado_h,
+            estado_planta=self.estado_planta,
+            m_coffee_min_pct=e.m_capa_min_bh_pct,
+            potencia_res_kw=e_res / dt_h if dt_h > 0 else 0.0,
+            caudal_natural_m3_min=e.caudal_natural_m3_min,
+            setpoint_aplicado_c=self._sp_plc_c if self._sp_plc_c > 0 else self.params.setpoint_c,
+            fan_cmd_aplicado=fan_cmd,
+            heater_permiso=int(permiso_calor) if self.modo_lazo == "local" else heater_cmd,
+            flujo_invertido_aplicado=int(flujo_invertido),
         )
-
 
 if __name__ == "__main__":
     # Smoke test: emula al servidor (periodo 1 s) con factor 540 y el
@@ -251,7 +354,8 @@ if __name__ == "__main__":
         print("t[h]   T_process[C]  RH_proc[%]  M_coffee[% b.h.]  duty[%]")
         for i in range(60):
             out = plant.step(1.0, PlantInputs(heater_cmd=heater, fan_cmd=1, plant_mode=PLANT_MODE_RUN, comm_lost=False))
-            heater = 1 if out.t_process_c < 50.0 else 0   # PLC_PRG actual
+            # PLC_PRG: en 'plc' decide el todo/nada; en 'local' solo da el permiso.
+            heater = (1 if out.t_process_c < 50.0 else 0) if modo == "plc" else 1
             if i >= 54:
                 print(f"{out.tiempo_proceso_h:5.2f}  {out.t_process_c:11.2f}  {out.rh_process_pct:9.1f}  "
                       f"{out.m_coffee_pct:12.2f}  {out.heater_duty_pct:9.1f}")

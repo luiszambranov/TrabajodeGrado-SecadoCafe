@@ -173,6 +173,34 @@ class ParametrosSecador:
     t_setpoint_c: float = 50.0
     """Temperatura máxima del aire/grano sin daño (González et al., 2010)."""
 
+    # --- Reposo (ventilador apagado), 21 oct 2026 -------------------------
+    # La planta NO se congela al detener el proceso: con el ventilador
+    # apagado el lecho sigue intercambiando calor y humedad. Ficha y
+    # fuentes: data/reference/reposo_tiro_natural.md.
+
+    presion_sistema_pa: float = 100.0
+    """Pérdida de presión de diseño del sistema (lecho + resistencia +
+    compuertas + ductos) al caudal nominal de 8 m3/min
+    (data/reference/equipos_energia.md). Se usa para estimar el tiro natural
+    con una resistencia LINEAL en el caudal (régimen de baja velocidad de
+    Shedd en el lecho; para los accesorios turbulentos es conservador)."""
+
+    altura_tiro_natural_m: float = 0.6
+    """Altura de la columna de aire caliente plenum + lecho + cámara superior
+    que genera el efecto chimenea (estimación geométrica propia, declarada)."""
+
+    h_conv_natural_w_m2k: float = 4.0
+    """Coeficiente de convección natural de las superficies del lecho hacia
+    el ambiente de la cámara (rango típico 2-25 W/m2K para convección libre
+    en gases; Incropera et al., 2007, tabla 1.1). Se toma un valor bajo
+    porque la bandeja está dentro de la cámara (criterio propio)."""
+
+    area_perdidas_lecho_m2: float = 2.2
+    """Superficie del lecho que pierde calor en reposo: cara superior
+    (~1.3 m2, ver area_lecho_m2) + paredes de la bandeja (~0.9 m2 con 20 cm
+    de espesor). Con ventilador encendido estas pérdidas (~9 W/K) son <7 %
+    del término m_aire*cp (~140 W/K) y se desprecian, como antes."""
+
     @property
     def caudal_m3_s(self) -> float:
         return self.caudal_especifico_m3_min_kg * self.masa_cps_kg / 60.0
@@ -207,6 +235,27 @@ def potencia_requerida_kw(p: ParametrosSecador, t_amb_min_c: float = 14.3, fs: f
     return p.masa_aire_kg_s(t_amb_min_c) * CP_AIRE * (p.t_setpoint_c - t_amb_min_c) * fs
 
 
+G_GRAVEDAD = 9.81  # m/s2
+
+
+def masa_aire_tiro_natural_kg_s(t_caliente_c: float, t_ambiente_c: float, p: ParametrosSecador) -> float:
+    """Flujo de aire por efecto chimenea con el ventilador APAGADO [kg/s].
+
+    Tiro: dP = g * H * (rho_amb - rho_caliente)  (ASHRAE Fundamentals,
+    cap. 16, efecto chimenea). Resistencia del sistema lineal en el caudal,
+    anclada en el punto de diseño (presion_sistema_pa a caudal nominal):
+    Q = Q_nom * dP / dP_diseño. Si el aire interior no está más caliente
+    que el exterior no hay tiro ascendente (0). Ver
+    data/reference/reposo_tiro_natural.md.
+    """
+    if t_caliente_c <= t_ambiente_c:
+        return 0.0
+    rho_amb = densidad_aire(t_ambiente_c)
+    dp = G_GRAVEDAD * p.altura_tiro_natural_m * (rho_amb - densidad_aire(t_caliente_c))
+    q_m3_s = p.caudal_m3_s * dp / p.presion_sistema_pa
+    return q_m3_s * rho_amb
+
+
 def paso_plenum(
     t_process_c: float,
     t_ambiente_c: float,
@@ -215,20 +264,38 @@ def paso_plenum(
     dt_h: float,
     p: ParametrosSecador,
     fan_frac: float = 1.0,
+    m_aire_natural_kg_s: float = 0.0,
 ) -> tuple[float, float]:
     """Avanza la temperatura del plenum ``dt_h`` horas.
 
     Integra exactamente la EDO lineal de primer orden en el paso (no Euler),
     por lo que es estable con cualquier dt. Devuelve (T_nueva, potencia
     eléctrica de la resistencia efectivamente entregada [kW]).
+
+    ``m_aire_natural_kg_s``: con el ventilador apagado, aire que entra por
+    tiro natural (masa_aire_tiro_natural_kg_s); 0 = solo pérdidas UA.
+
+    Protección por sobretemperatura (21 oct 2026): si con la resistencia
+    encendida el plenum superaría ``t_max_seguridad_c``, el corte térmico
+    abre y el paso se integra con la resistencia APAGADA. Antes se recortaba
+    el número (min(T, 90 °C)) sin quitar la potencia, lo que ocultaba el
+    efecto físico.
     """
     heater = 1 if (heater_cmd and fan_cmd) else 0          # enclavamiento de flujo
-    p_res = p.potencia_resistencia_kw * heater
-    g = p.ua_plenum_kw_k + (p.masa_aire_kg_s(t_ambiente_c, fan_frac) * CP_AIRE if fan_cmd else 0.0)  # kW/K
-    t_eq = t_ambiente_c + p_res / g
+    m_aire = p.masa_aire_kg_s(t_ambiente_c, fan_frac) if fan_cmd else m_aire_natural_kg_s
+    g = p.ua_plenum_kw_k + m_aire * CP_AIRE  # kW/K
     tau_s = p.capacidad_plenum_kj_k / g
-    t_nuevo = t_eq + (t_process_c - t_eq) * math.exp(-dt_h * 3600.0 / tau_s)
-    return float(min(t_nuevo, p.t_max_seguridad_c)), p_res
+
+    def integrar(p_res: float) -> float:
+        t_eq = t_ambiente_c + p_res / g
+        return t_eq + (t_process_c - t_eq) * math.exp(-dt_h * 3600.0 / tau_s)
+
+    p_res = p.potencia_resistencia_kw * heater
+    t_nuevo = integrar(p_res)
+    if heater and t_nuevo > p.t_max_seguridad_c:
+        p_res = 0.0
+        t_nuevo = integrar(0.0)
+    return float(t_nuevo), p_res
 
 
 if __name__ == "__main__":

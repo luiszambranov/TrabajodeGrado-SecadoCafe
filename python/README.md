@@ -1,7 +1,10 @@
 # /python — planta simulada, campaña Monte Carlo y análisis
 
-Estado: 19 oct 2026. Modelo cerrado, campaña Monte Carlo ejecutada (150
-realizaciones) y planta integrada con la HMI final (CODESYS v7). Lo retirado está en `legacy/` (ver `legacy/README.md` y
+Estado: 21 oct 2026. Modelo cerrado, campaña Monte Carlo ejecutada (150
+realizaciones) y planta integrada con la HMI final (CODESYS v7). Desde el
+21 oct 2026 la planta **no se congela** con STOP/HOLD ni con pérdida de
+comunicación: la física, el reloj y el clima día/noche siguen (guía de
+cierre, R4; ver `../data/reference/reposo_tiro_natural.md`). Lo retirado está en `legacy/` (ver `legacy/README.md` y
 `../docs/evolucion_del_modelo.md`).
 
 ## Cómo correr
@@ -13,6 +16,11 @@ pip install -r requirements.txt          # pymodbus==3.6.9, numpy, scipy, pandas
 python modbus_server.py
 python modbus_server.py --factor-aceleracion 1 --lazo-termico plc   # verificación a tiempo real
 python modbus_server.py --plant toy                                 # solo prueba de comunicación
+python modbus_server.py --hora-inicio 8 --log-csv ensayo_F1.csv     # arranca a las 08:00 y registra cada ciclo
+#   --post-ventilacion-min 10 (default): minutos de modelo de ventilación tras perder la comunicación
+
+# Ensayo de continuidad física (sin CODESYS): paro, enfriamiento y comunicación perdida
+python ensayo_continuidad_fisica.py   # -> resultados/ensayos/continuidad_fisica.csv + ../figures/ensayo_continuidad_fisica.png
 
 # Campaña Monte Carlo (sin CODESYS; se reanuda sola si se interrumpe)
 python campana_montecarlo.py --n 10  --semilla-inicial 1    --salida resultados/piloto  --procesos 4
@@ -55,9 +63,9 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 | Archivo | Qué hace |
 |---|---|
 | `cinetica_roa.py` | **Modelo cinético único**: isoterma de Roa para café pergamino (Trejos et al., 1989) + ecuación de capa delgada de Roa (SECAFÉ, Parra-Coronado et al., 2008). M0 = 55 % b.h., objetivo 11 % b.h. Paso por tiempo equivalente, rehumectación cuando M < Me, horas fuera de rango. Fuentes y erratas: `../data/reference/roa_cenicafe_isoterma_capa_delgada.md`. |
-| `dinamica_termica.py` | `ParametrosSecador` (80 kg c.p.s., 0.1 m³/min/kg, lecho de 20 cm, resistencia de 6 kW, ventilador de 0.20 kW, caudal 30–100 %) y plenum con enclavamiento de flujo. Dimensionamiento: `../data/reference/secador_electrico_dimensionamiento.md`. |
-| `lecho_secado.py` | Lecho de 8 capas de 2.5 cm (modelo de Thompson, como SECAFÉ) con la cinética de Roa en cada capa y balance de humedad y calor del aire. |
-| `secador_electrico.py` | Núcleo físico del secador (plenum + lecho + contadores de energía, agua, horas con grano > 50 °C). Lo comparten `planta_secado.py` y `control_supervisado.py`, así que CODESYS y Monte Carlo ven la misma planta. |
+| `dinamica_termica.py` | `ParametrosSecador` (80 kg c.p.s., 0.1 m³/min/kg, lecho de 20 cm, resistencia de 6 kW, ventilador de 0.20 kW, caudal 30–100 %) y plenum con enclavamiento de flujo. Protección de 90 °C que abre la resistencia y tiro natural con el ventilador apagado (21 oct 2026). Dimensionamiento: `../data/reference/secador_electrico_dimensionamiento.md`. |
+| `lecho_secado.py` | Lecho de 8 capas de 2.5 cm (modelo de Thompson, como SECAFÉ) con la cinética de Roa en cada capa y balance de humedad y calor del aire. `paso_reposo`: enfriamiento y secado residual con el ventilador apagado (21 oct 2026). |
+| `secador_electrico.py` | Núcleo físico del secador (plenum + lecho + contadores de energía, agua, horas con grano > 50 °C). Lo comparten `planta_secado.py` y `control_supervisado.py`, así que CODESYS y Monte Carlo ven la misma planta. Reloj de la planta/clima separado del tiempo del lote; `nuevo_lote` no enfría la cámara (21 oct 2026). |
 
 ### Clima (perturbaciones)
 
@@ -79,8 +87,10 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 
 | Archivo | Qué hace |
 |---|---|
-| `modbus_server.py` | Servidor Modbus TCP (Python = esclavo). 27 registros (0–26), watchdog, `heartbeat`. Arranca en HOLD y congela el modelo mientras `plant_mode = 1` (19 oct 2026). Mapa completo en `../docs/tabla_variables.md`. |
-| `planta_secado.py` | `ModeloSecadoPlant`: la física de `secador_electrico.py` detrás de la interfaz `Plant`. Lazo térmico local cuando la simulación va acelerada (corrección del 4 oct 2026); desde el 19 oct 2026 el termostato usa la consigna que envía el PLC (registro 26; 0 = 50 °C). |
+| `modbus_server.py` | Servidor Modbus TCP (Python = esclavo). 41 registros (0–40), watchdog, `heartbeat`. Arranca en HOLD; la física avanza siempre (21 oct 2026; antes se congelaba en HOLD). Relojes y estado en 27–39; estado del enlace FluidSIM en 40 (ensayo F2; CODESYS v8). `--log-csv` guarda una fila por ciclo. Mapa completo en `../docs/tabla_variables.md`. |
+| `planta_secado.py` | `ModeloSecadoPlant`: la física de `secador_electrico.py` detrás de la interfaz `Plant`. Lazo térmico local cuando la simulación va acelerada (corrección del 4 oct 2026); el termostato usa la consigna del PLC (registro 26) y solo calienta con el permiso `heater_cmd` (en ENFRIAMIENTO no calienta). Relojes (planta, lote, proceso, secado, parado), estado de la planta y política de fallo local (post-ventilación) desde el 21 oct 2026. |
+| `graficas_ensayos.py` | Tabla y figura de los ensayos de fallo F1–F5 con CODESYS y FluidSIM reales (`resultados/ensayos/*.csv` → `resultados/ensayos/resumen_ensayos.md` y `../figures/ensayos_fallos_F1_F2_F3.png`). |
+| `ensayo_continuidad_fisica.py` | Ensayo sin CODESYS: paro, enfriamiento, comunicación perdida y recuperación con la cámara caliente. CSV + figura. |
 
 ### Campaña, análisis, validación y energía
 
@@ -109,4 +119,8 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 - La validación muestra sesgos conocidos por tipo de secado
   (`../data/reference/validacion_modelo.md`); no cambian el orden de las
   estrategias.
-- Sensibilidad a climas extremos: pendiente de decidir con el asesor.
+- Sensibilidad a climas extremos: pendiente (guía de cierre, R3).
+- Reposo (ventilador apagado): tiro natural con resistencia lineal y
+  pérdidas del lecho con h = 4 W/m²K, supuestos declarados con
+  sensibilidad en `../data/reference/reposo_tiro_natural.md`. Tras la
+  descarga Python sigue simulando el lecho hasta el siguiente «Nuevo lote».

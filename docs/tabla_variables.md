@@ -1,6 +1,6 @@
 # Tabla de variables del sistema
 
-Versión: 19 oct 2026 (registro 26 `setpoint_cmd`; modelo congelado en HOLD). Fuente única de verdad en el código:
+Versión: 21 oct 2026 (la planta ya no se congela en HOLD; registros 27–39 de relojes y estado; registro 40 de enlace FluidSIM; CODESYS v8). Fuente única de verdad en el código:
 `python/modbus_server.py` (mapa de registros), `python/dinamica_termica.py`
 (`ParametrosSecador`), `python/control_supervisado.py` (`ParametrosControl`),
 `python/cinetica_roa.py`, `python/generador_ambiente.py` y
@@ -42,7 +42,7 @@ palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0
 | 6 | `plant_mode` | WORD | 0 = RUN, 1 = HOLD | CODESYS → Python | 0/1 | `plant_mode` |
 | 7 | `safety_ok` | WORD 0/1 | – | Python → CODESYS | 0/1 | `safety_ok` |
 | 8–9 | `M_coffee` | REAL | % b.h. | Python → CODESYS | 11–56 | `M_coffee` |
-| 10–11 | `tiempo_proceso_h` | REAL | h de modelo | Python → CODESYS | 0–100 | `tiempo_secado_h` |
+| 10–11 | `tiempo_proceso_h` | REAL | h de modelo en RUN con ventilador (secado + inversión + enfriamiento) | Python → CODESYS | 0–100 | `tiempo_secado_h` |
 | 12 | `heartbeat` | WORD | contador | Python → CODESYS | 0–65535 | `heartbeat_actual` |
 | 13–14 | `RH_process` | REAL | % | Python → CODESYS | 5–100 | `RH_process` |
 | 15 | `flow_dir_cmd` | WORD 0/1 | 0 = abajo→arriba, 1 = invertido | CODESYS → Python | 0/1 | `flow_dir_cmd` |
@@ -53,11 +53,21 @@ palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0
 | 22–23 | `caudal` | REAL | m³/min | Python → CODESYS | 0–8 | `caudal_m3_min` |
 | 24–25 | `energia_kWh` | REAL | kWh | Python → CODESYS | 0–~150 por lote | `energia_kWh` (v5) |
 | 26 | `setpoint_cmd` | WORD | °C enteros | CODESYS → Python | 35–55 (0 = 50 °C por defecto) | `setpoint_cmd` (v7) |
+| 27–28 | `tiempo_lote_h` | REAL | h de modelo desde "Nuevo lote" (incluye paradas) | Python → CODESYS | 0–200 | `t_lote_raw` (v8) |
+| 29–30 | `tiempo_secado_h` | REAL | h con calentamiento permitido (secado efectivo); reloj de inversión desde v8 | Python → CODESYS | 0–100 | `t_secado_ef_raw` (v8) |
+| 31–32 | `tiempo_parado_h` | REAL | h del lote sin RUN (paro, falla, fin, reposo) | Python → CODESYS | 0–200 | `t_parado_raw` (v8) |
+| 33–34 | `tiempo_planta_h` | REAL | h desde que arrancó la planta (no se reinicia) | Python → CODESYS | 0–… | `t_planta_raw` (v8) |
+| 35 | `estado_planta` | WORD | 0 REPOSO, 1 SECANDO, 2 VENTILANDO, 3 POST-VENT., 4 FALLA COMM | Python → CODESYS | 0–4 | `estado_planta` (v8) |
+| 36–37 | `T_ambiente` | REAL | °C | Python → CODESYS | 10–35 | `T_amb_raw` (v8) |
+| 38–39 | `hora_dia` | REAL | h (0–24) del reloj de la planta | Python → CODESYS | 0–24 | `hora_raw` (v8) |
+| 40 | `fluidsim_estado` | WORD | 0 no informado, 1 vivo, 2 sin_fluidsim declarado, 3 enlace caído | CODESYS → Python | 0–3 | `fluidsim_estado_cmd` (v8) |
 
-Modo de planta: el servidor arranca en HOLD y, mientras `plant_mode = 1` (REPOSO, PARO, FIN DE SECADO), el modelo se congela: no avanzan tiempo, humedad ni energía (19 oct 2026).
+Modo de planta (21 oct 2026): el servidor arranca en HOLD. En HOLD (REPOSO, PARO, FIN DE SECADO, FALLA, EMERGENCIA) la resistencia y el ventilador quedan apagados, pero **la física sigue**: el reloj y el clima día/noche avanzan, la cámara y el café se enfrían hacia el ambiente y hay un secado residual pequeño por tiro natural (`data/reference/reposo_tiro_natural.md`). Hasta el 20 oct 2026 el modelo se congelaba en HOLD. En lazo local, `heater_cmd` es el permiso de calentar: en ENFRIAMIENTO el ventilador sigue y la resistencia no enciende.
 
-Seguridad: si CODESYS no escribe en 5 s, Python fuerza resistencia y
-ventilador a 0 y publica `safety_ok = 0`. Si `heartbeat` no cambia en 4 s,
+Seguridad: si CODESYS no escribe en 5 s, Python aplica su política de
+fallo local: resistencia apagada de inmediato, ventilador en
+post-ventilación 10 min de modelo (`--post-ventilacion-min`) y luego
+apagado; publica `safety_ok = 0` y la planta sigue integrando. Si `heartbeat` no cambia en 4 s,
 CODESYS declara `comm_error` y apaga sus comandos.
 
 ## 3. Parámetros del modelo (fijos, con fuente)
@@ -77,6 +87,10 @@ CODESYS declara `comm_error` y apaga sus comandos.
 | Isoterma de equilibrio | Roa, medida a 10–55 °C | Trejos, Roa & Oliveros (1989) |
 | Cinética de capa delgada | Roa (m = 0.0143, n = 0.87898, q = 1.06439) | Parra-Coronado et al. (2008), SECAFÉ |
 | Constante de tiempo del plenum | ≈ 106 s | Calculada (`dinamica_termica.py`) |
+| Protección por sobretemperatura | 90 °C: abre la resistencia (ya no recorta el valor) | Criterio de protección (21 oct 2026) |
+| Tiro natural (ventilador apagado) | ΔP = g·H·Δρ, H = 0.6 m; resistencia lineal anclada en 100 Pa a 8 m³/min | ASHRAE (2021); ASABE D272; `reposo_tiro_natural.md` |
+| Pérdidas del lecho en reposo | h = 4 W/m²K sobre 2.2 m² | Incropera et al. (2007); criterio propio |
+| Post-ventilación ante fallo de comunicación | 10 min de modelo | Criterio propio declarado |
 | Incremento solar pasiva | 4.4 °C máx. | Calibrado con Peñuela-Martínez et al. (2025): 10.6 días |
 | Incremento solar activa | 12.5 °C máx. | Reducción 47.5 % vs. pasiva (Duque-Dussán et al., 2026; Meja et al., 2025) |
 | Área solar | 11.1 m² (7.2 kg c.p.s./m², capa de 2 cm) | Peñuela-Martínez et al. (2025) |

@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Symbolconfiguration xmlns="http://www.3s-software.com/schemas/Symbolconfiguration.xsd">
+  <Header>
+    <Version>3.5.9.0</Version>
+    <SymbolConfigObject version="3.5.9.10" />
+    <ProjectInfo name="SecadoCafe_Terminado" devicename="Device" appname="Application" />
+  </Header>
+  <TypeList>
+    <TypeSimple name="T_BOOL" size="1" swapsize="0" typeclass="Bool" iecname="BOOL" />
+    <TypeSimple name="T_BYTE" size="1" swapsize="1" typeclass="Byte" iecname="BYTE" />
+    <TypeSimple name="T_INT" size="2" swapsize="2" typeclass="Int" iecname="INT" />
+    <TypeSimple name="T_STRING_30_" size="31" swapsize="0" typeclass="String" iecname="STRING(30)" />
+    <TypeSimple name="T_STRING_40_" size="41" swapsize="0" typeclass="String" iecname="STRING(40)" />
+    <TypeUserDef name="T_E_ESTADO" size="2" nativesize="2" swapsize="2" typeclass="Enum" iecname="E_ESTADO" basetype="T_INT">
+      <UserDefElement type="T_E_ESTADO" iecname="REPOSO" enumvalue="0" />
+      <UserDefElement type="T_E_ESTADO" iecname="CARGA" enumvalue="1" />
+      <UserDefElement type="T_E_ESTADO" iecname="SECADO" enumvalue="2" />
+      <UserDefElement type="T_E_ESTADO" iecname="INVERSION" enumvalue="3" />
+      <UserDefElement type="T_E_ESTADO" iecname="ENFRIAMIENTO" enumvalue="4" />
+      <UserDefElement type="T_E_ESTADO" iecname="FIN_SECADO" enumvalue="5" />
+      <UserDefElement type="T_E_ESTADO" iecname="DESCARGA" enumvalue="6" />
+      <UserDefElement type="T_E_ESTADO" iecname="PARO" enumvalue="7" />
+      <UserDefElement type="T_E_ESTADO" iecname="FALLA" enumvalue="8" />
+      <UserDefElement type="T_E_ESTADO" iecname="EMERGENCIA" enumvalue="9" />
+    </TypeUserDef>
+  </TypeList>
+  <NodeList>
+    <Node name="Application">
+      <Node name="GVL_SECUENCIA">
+        <Node name="aire_invertido" type="T_BOOL" access="ReadWrite" />
+        <Node name="calentar" type="T_BOOL" access="ReadWrite" />
+        <Node name="estado" type="T_E_ESTADO" access="ReadWrite" />
+        <Node name="estado_txt" type="T_STRING_30_" access="ReadWrite" />
+        <Node name="falla_codigo" type="T_INT" access="ReadWrite" />
+        <Node name="falla_txt" type="T_STRING_40_" access="ReadWrite" />
+        <Node name="hmi_nuevo_lote" type="T_BOOL" access="ReadWrite" />
+        <Node name="hmi_start" type="T_BOOL" access="ReadWrite" />
+        <Node name="hmi_stop" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_1B1" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_1B2" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_2B1" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_2B2" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_EMERGENCIA_NC" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_START" type="T_BOOL" access="ReadWrite" />
+        <Node name="I_STOP_NC" type="T_BOOL" access="ReadWrite" />
+        <Node name="INPUT0" type="T_BYTE" access="ReadWrite" />
+        <Node name="lote_preparado" type="T_BOOL" access="ReadWrite" />
+        <Node name="nuevo_lote" type="T_BOOL" access="ReadWrite" />
+        <Node name="OUTPUT0" type="T_BYTE" access="ReadWrite" />
+        <Node name="planta_run" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_1S1" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_1S2" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_2S1" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_2S2" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_H1_VERDE" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_H2_AMARILLA" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_H3_ROJA" type="T_BOOL" access="ReadWrite" />
+        <Node name="Q_K1" type="T_BOOL" access="ReadWrite" />
+        <Node name="sin_fluidsim" type="T_BOOL" access="ReadWrite" />
+        <Node name="ventilador" type="T_BOOL" access="ReadWrite" />
+      </Node>
+    </Node>
+  </NodeList>
+</Symbolconfiguration>

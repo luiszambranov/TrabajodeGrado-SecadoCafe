@@ -64,9 +64,12 @@ Clima de Chinchiná ─> Python (planta: secador, lecho, cinética)  ⇄ Modbus 
 ```
 
 - **Python = servidor Modbus** (esclavo): publica temperatura, humedades,
-  caudal, energía y estado; recibe comandos y la consigna del perfil. 27
-  registros (`docs/tabla_variables.md`). Arranca en HOLD y congela el modelo
-  mientras el PLC no está secando.
+  caudal, energía, relojes y estado; recibe comandos y la consigna del
+  perfil. 40 registros (`docs/tabla_variables.md`). Arranca en HOLD; desde
+  el 21 oct 2026 la física **nunca se pausa**: con STOP, fin de secado o
+  pérdida de comunicación solo cambian los comandos y la planta sigue
+  enfriándose y evolucionando con el clima día/noche
+  (`data/reference/reposo_tiro_natural.md`).
 - **CODESYS = cliente** (maestro): máquina de estados (`SECUENCIA`), RUN/HOLD,
   perfil térmico y caudal elegidos en la HMI, inversión del aire cada 6 h,
   parada por humedad, watchdog en los dos sentidos, HMI y semáforo.
