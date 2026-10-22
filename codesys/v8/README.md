@@ -118,6 +118,8 @@ que tenía la simulación); mientras tanto START no hace nada y `SECUENCIA.txt_m
 | Alarma activa (texto de la falla) | `SECUENCIA.txt_alarma` |
 | Comunicación con Python (OK / ERROR) | `SECUENCIA.txt_comm` |
 | Aviso de datos vencidos (R5) | `PLC_PRG.txt_datos`; `PLC_PRG.datos_validos` para ocultar/atenuar valores |
+
+> **R5, lote completo (22 oct 2026):** la tendencia (Trend Recording) muestra una ventana móvil y no se logró conservar el lote desde t = 0. La historia del lote se grafica desde el CSV del servidor con `python/grafica_lote.py`, que `modbus_server.py` genera sola al terminar cada lote (CSV y PNG en `python/resultados/lotes/`, o junto al `--log-csv` indicado). Se declara como limitación.
 | Modo de E/S / sincronización | `SECUENCIA.txt_modo` |
 
 El campo de «Tiempo de secado» que ya existe sigue en `PLC_PRG.tiempo_secado_h` (registro 10,

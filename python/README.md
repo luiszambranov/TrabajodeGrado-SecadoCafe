@@ -23,6 +23,7 @@ python modbus_server.py --semilla 1001 --log-csv resultados/verificacion/V1001_R
 python r1_analisis_pareado.py ; python r2_limites_actuacion.py ; python r3_sensibilidad_clima.py
 python sensibilidad_tornado.py ; python graficas_ensayos.py
 python compara_codesys_replica.py resultados/verificacion/V1001_REF.csv --semilla 1001 --perfil REF
+python grafica_lote.py resultados/verificacion/V1001_REF.csv     # a mano; el servidor ya la genera solo al terminar cada lote
 #   --post-ventilacion-min 10 (default): minutos de modelo de ventilación tras perder la comunicación
 
 # Ensayo de continuidad física (sin CODESYS): paro, enfriamiento y comunicación perdida
@@ -120,6 +121,7 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 | `r3_sensibilidad_clima.py` | R3: 12 corridas dirigidas (C0, CT±, CH±, C*) × REF y P1-C75 + 4 solares. → `resultados/r3/` |
 | `sensibilidad_tornado.py` | Sensibilidad ±20 % de un factor a la vez (cinética, caudal, UA, espesor). → `resultados/sensibilidad/` |
 | `compara_codesys_replica.py` | Verificación CODESYS vs. réplica con la misma semilla (`modbus_server.py --semilla N`). |
+| `grafica_lote.py` | Gráfica del lote completo desde el CSV de `--log-csv`: temperatura, consigna y ambiente; humedad (promedio y capas, inversiones, cambio de consigna, fin); potencia y caudal; estado de la planta sombreado. `modbus_server.py` la genera sola al terminar cada lote (`<csv>_loteN.png`) y al cerrarse si el lote no había terminado; sin `--log-csv` el CSV va a `resultados/lotes/servidor_<fecha>_<hora>.csv` (`--sin-grafica`, `--sin-log` para desactivar). Sustituye la tendencia de la HMI para R5 (22 oct 2026). |
 | `graficas_ensayos.py` | Tabla y figura de los ensayos de fallo F1–F5. → `resultados/ensayos/` |
 
 ### Resultados

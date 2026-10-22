@@ -15,7 +15,7 @@ Todo se regenera con los scripts indicados; cada uno escribe su resumen `.md` y 
 | R1 · Mejoría y variabilidad | **Cumple** (falta confirmar el umbral de relevancia con el asesor) | `resultados/r1/resumen_r1.md`, `figures/r1_diferencias_pareadas.png`, `resultados/campana/resumen_resultados.md` |
 | Sensibilidad ±20 % (evaluador §3.6) | Hecho | `resultados/sensibilidad/resumen_tornado.md`, `figures/sensibilidad_tornado.png` |
 | Python vs. CODESYS (guía p. 10; evaluador §3.1) | **Hecho (22 oct): 3 corridas, diferencias ≤ 0,21 % en tiempo y ≤ 0,14 % en energía** | Tabla V1; `compara_codesys_replica.py`; `resultados/verificacion/*.csv` |
-| R5 · Tendencias HMI | Pendiente en CODESYS (vista del lote desde t = 0); Python ya deja el CSV del lote y `txt_datos` | `codesys/v8/README.md` |
+| R5 · Tendencias HMI | **Resuelto con limitación declarada (22 oct):** la tendencia de CODESYS muestra una ventana móvil; el lote completo se grafica desde el CSV del servidor | `python/grafica_lote.py`, `figures/lote_codesys_*.png`, `figures/hmi_secado_terminado_REF.png` |
 | R6 · Economía | Juan (lista en `Tareas_documento_Juan.pdf`) | — |
 
 ---
@@ -161,6 +161,20 @@ Nota de procedimiento: un primer intento de la corrida 3 quedó con REF porque e
 
 ---
 
+## R5 · Historia del lote completo (22 oct 2026)
+
+La tendencia de la HMI (Trend Recording de CODESYS V3.5 SP9) muestra una ventana de tiempo que se desplaza, y no se logró configurarla para conservar el lote completo desde t = 0. Como el servidor de la planta registra cada ciclo en un CSV (lo que CODESYS envió y lo que la planta aplicó), la historia completa se reconstruye con `python/grafica_lote.py`, que `modbus_server.py` ejecuta solo al terminar cada lote, aunque se arranque sin opciones (CSV y figura en `python/resultados/lotes/`). Figura principal: `figures/lote_codesys_P3C100.png` (lote con P3 y caudal 100 %, sin paradas: se ve el cambio de 35 a 50 °C a las 40,2 h, cuando el promedio baja a 29,7 % b.h., y cómo la potencia de la resistencia sube con la nueva consigna). Complementarias: `figures/lote_codesys_P1C75.png` y `figures/lote_codesys_REF.png` (corridas de verificación con CODESYS y FluidSIM reales); la HMI al final del lote está en `figures/hmi_secado_terminado_REF.png`.
+
+**Párrafo para el documento (resultados del objetivo 2):**
+
+> La HMI de CODESYS presenta las variables en línea y sus tendencias en una ventana de tiempo móvil, adecuada para la operación pero insuficiente para revisar un lote completo, que con el factor de aceleración de 540 dura entre 4 y 7 minutos reales. Para conservar la historia del lote, el servidor de la planta registra en cada ciclo (0,15 h de modelo) las órdenes recibidas del PLC, el estado de la planta, las temperaturas, la humedad por capas, la potencia y la energía, y al terminar genera la gráfica del lote completo (Figura X). En ella se observa la respuesta del sistema durante todo el proceso: la temperatura del aire sigue la consigna enviada por CODESYS, incluido el cambio de 35 a 50 °C del perfil P3 cuando la humedad promedio cruza el 30 % b.h., sin superar el límite de 50 °C más allá de la oscilación del control (máximo 50,2 °C), la potencia de la resistencia varía con el ciclo día/noche de la temperatura ambiente, cada inversión del flujo de aire cambia la pendiente de secado de las capas extremas y el lote termina cuando la humedad promedio llega a 11 % b.h. con la capa más húmeda por debajo de 12 % b.h.
+
+**Limitación (para la sección de limitaciones):**
+
+> La tendencia nativa de la HMI no conserva el lote completo; la historia del lote se presenta a partir del registro del servidor de la planta y no desde el histórico del PLC. En una implementación real, este registro correspondería al histórico del sistema SCADA o a un servicio de base de datos de series de tiempo en la capa IoT.
+
+---
+
 ## Cifras que deben coincidir en todo el documento
 
 | Cifra | Valor |
@@ -180,8 +194,8 @@ Nota de procedimiento: un primer intento de la corrida 3 quedó con REF porque e
 **Luis (PC):**
 1. ~~CODESYS: líneas de P2 y P3 y selector de perfil~~ **Hecho**; falta commit y tag.
 2. ~~Corridas de equivalencia con CODESYS~~ **Hecho el 22 oct: las 3 cumplen (Tabla V1).**
-3. R5 en CODESYS: tendencia del lote desde t = 0 en horas de modelo, retención para lote completo y `PLC_PRG.txt_datos` visible. Hacer una captura hacia el final del lote donde se vea el inicio.
+3. ~~R5 en CODESYS~~ **Resuelto con `grafica_lote.py` (limitación declarada abajo).** Opcional: correr un lote con P3 (`python modbus_server.py`, sin opciones) para tener la figura con el cambio de consigna; aparece sola en `resultados/lotes/` al terminar el lote.
 4. Confirmar con el asesor el umbral de relevancia (10 %) y la convención de la Ec. 5.
 5. Grabar el video de la simulación con la versión final (anexo en Drive).
 
-**Juan (documento):** pasar las cifras y párrafos de este archivo a Resultados, Resumen/Abstract y conclusiones del objetivo 3, junto con la Tabla 5 reorganizada, la Tabla V1 de equivalencia con su párrafo y las figuras `r1_diferencias_pareadas.png`, `r2_trazas_actuacion.png`, `r3_efecto_clima.png`, `sensibilidad_tornado.png` y `ensayos_fallos_F1_F2_F3.png`.
+**Juan (documento):** pasar las cifras y párrafos de este archivo a Resultados, Resumen/Abstract y conclusiones del objetivo 3, junto con la Tabla 5 reorganizada, la Tabla V1 de equivalencia con su párrafo y las figuras `lote_codesys_P3C100.png` (con el párrafo y la limitación de R5), `r1_diferencias_pareadas.png`, `r2_trazas_actuacion.png`, `r3_efecto_clima.png`, `sensibilidad_tornado.png` y `ensayos_fallos_F1_F2_F3.png`.

@@ -17,4 +17,5 @@ la campaña Monte Carlo (convergencia, cajas, Pareto) están en
 
 | Archivo | Contenido |
 |---|---|
-| `hmi_secado_terminado_REF.png` | HMI v8 al terminar un lote REF (50 °C, 100 %): piloto «Secado terminado», «Bandeja adentro», «Aire invertido», comunicación con Python OK, selector de perfil y caudal. **Provisional:** la tendencia de temperatura del aire está vacía (Trace detenida) y la de humedad no muestra el lote desde t = 0; para R5 se reemplaza por la captura con la tendencia completa. |
+| `hmi_secado_terminado_REF.png` | HMI v8 al terminar un lote REF (50 °C, 100 %): pilotos «Secado terminado», «Bandeja adentro», «Aire invertido», comunicación con Python OK, energía 143,3 kWh, selector de perfil y caudal. Las tendencias de la HMI muestran solo una ventana móvil (limitación de R5); el lote completo está en `lote_codesys_*.png`. |
+| `lote_codesys_P1C75.png`, `lote_codesys_REF.png` | Lote completo supervisado por CODESYS + FluidSIM (corridas de verificación, semilla 1001), generado por `python/grafica_lote.py` desde el CSV del servidor: temperatura, consigna y ambiente; humedad promedio y por capas con inversiones de flujo y fin de secado; potencia y caudal. |

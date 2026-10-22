@@ -243,6 +243,7 @@ from __future__ import annotations
 import abc
 import argparse
 import logging
+import os
 import struct
 import threading
 import time
@@ -515,9 +516,18 @@ class RegistroCSV:
         "caudal_m3_min", "caudal_natural_m3_min", "energia_kwh",
     ]
 
-    def __init__(self, ruta: str) -> None:
+    CICLOS_TRAS_FIN = 8   # ciclos (≈1,2 h de modelo) después del fin para que la gráfica muestre la ventilación final
+
+    def __init__(self, ruta: str, grafica_auto: bool = True) -> None:
         import csv
         import os
+        self.ruta = ruta
+        self.grafica_auto = grafica_auto
+        self.n_lote = 1
+        self._t_lote_prev = None
+        self._fin_visto = False
+        self._cuenta_tras_fin = None
+        self.lote_graficado = False
         carpeta = os.path.dirname(ruta)
         if carpeta:
             os.makedirs(carpeta, exist_ok=True)   # crea resultados/... si no existe
@@ -547,6 +557,40 @@ class RegistroCSV:
             f(o.heater_duty_pct), f(o.caudal_m3_min), f(o.caudal_natural_m3_min), f(o.energia_kwh),
         ])
         self._f.flush()
+        self._vigilar_fin_de_lote(o)
+
+    def _vigilar_fin_de_lote(self, o: "PlantOutputs") -> None:
+        """R5: al cumplirse el criterio de fin (promedio ≤ 11 % y capa más húmeda ≤ 12 % b.h.)
+        genera sola la gráfica del lote completo, sin cerrar el servidor."""
+        if self._t_lote_prev is not None and o.t_lote_h is not None and o.t_lote_h < self._t_lote_prev:
+            self.n_lote += 1                       # «Nuevo lote» en CODESYS
+            self._fin_visto, self._cuenta_tras_fin, self.lote_graficado = False, None, False
+        self._t_lote_prev = o.t_lote_h
+        if not self.grafica_auto or self._fin_visto:
+            if self._cuenta_tras_fin is not None:
+                self._cuenta_tras_fin += 1
+                if self._cuenta_tras_fin >= self.CICLOS_TRAS_FIN:
+                    self._cuenta_tras_fin = None
+                    self.graficar_en_segundo_plano()
+            return
+        m, mx, ts = o.m_coffee_pct, o.m_coffee_max_pct, o.t_secado_h
+        if None not in (m, mx, ts) and m <= 11.0 and mx <= 12.0 and ts > 0:
+            self._fin_visto, self._cuenta_tras_fin = True, 0
+            log.info("Fin de secado (lote %d): la gráfica del lote se genera en %d ciclos.", self.n_lote, self.CICLOS_TRAS_FIN)
+
+    def graficar_en_segundo_plano(self) -> None:
+        import os
+        salida = os.path.splitext(self.ruta)[0] + f"_lote{self.n_lote}.png"
+        self.lote_graficado = True
+
+        def tarea():
+            try:
+                from grafica_lote import graficar
+                log.info("Gráfica del lote %d: %s", self.n_lote, graficar(self.ruta, salida))
+            except Exception as exc:   # nunca debe afectar al servidor
+                log.warning("No se pudo generar la gráfica del lote (%s). A mano: python grafica_lote.py %s",
+                            exc, self.ruta)
+        threading.Thread(target=tarea, daemon=True).start()
 
     def cerrar(self) -> None:
         self._f.close()
@@ -763,6 +807,12 @@ def main() -> None:
     parser.add_argument("--log-csv", default=None,
                         help="Ruta de un CSV con una fila por ciclo (relojes, estado, enlaces, comandos, "
                              "T, HR, humedad, potencia, energía). Evidencia de los ensayos F1-F5.")
+    parser.add_argument("--sin-grafica", action="store_true",
+                        help="No generar la gráfica del lote (por defecto se genera sola al terminar cada lote, "
+                             "<csv>_loteN.png, y al cerrar el servidor si el lote no había terminado)")
+    parser.add_argument("--sin-log", action="store_true",
+                        help="No guardar CSV. Sin --log-csv, el servidor guarda por defecto en "
+                             "resultados/lotes/servidor_<fecha>_<hora>.csv")
     args = parser.parse_args()
     WATCHDOG_TIMEOUT_S = args.watchdog_timeout
 
@@ -797,7 +847,12 @@ def main() -> None:
     else:
         plant: Plant = ToyPlant()
     stop_event = threading.Event()
-    registro_csv = RegistroCSV(args.log_csv) if args.log_csv else None
+    if not args.log_csv and not args.sin_log and args.plant == "modelo":
+        # R5 (22 oct 2026): siempre se registra el lote, aunque se arranque el servidor sin opciones
+        from datetime import datetime
+        args.log_csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resultados", "lotes",
+                                    datetime.now().strftime("servidor_%Y%m%d_%H%M%S.csv"))
+    registro_csv = RegistroCSV(args.log_csv, grafica_auto=not args.sin_grafica) if args.log_csv else None
     if registro_csv:
         log.info("Registro CSV por ciclo en %s", args.log_csv)
 
@@ -837,6 +892,15 @@ def main() -> None:
         hilo_planta.join(timeout=2)
         if registro_csv:
             registro_csv.cerrar()
+            if not args.sin_grafica and not registro_csv.lote_graficado:
+                # R5: la tendencia de la HMI no conserva el lote completo; se grafica desde el CSV
+                try:
+                    from grafica_lote import graficar
+                    log.info("Gráfica del lote completo: %s",
+                             graficar(args.log_csv, os.path.splitext(args.log_csv)[0] + f"_lote{registro_csv.n_lote}.png"))
+                except Exception as exc:  # la gráfica nunca debe impedir cerrar el servidor
+                    log.warning("No se pudo generar la gráfica del lote (%s). "
+                                "Correr a mano: python grafica_lote.py %s", exc, args.log_csv)
 
 
 if __name__ == "__main__":
