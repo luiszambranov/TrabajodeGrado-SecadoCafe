@@ -282,14 +282,19 @@ Implementado en `campana_montecarlo.py` (corridas) y `analisis_montecarlo.py`
 
 Factor A, perfil térmico (setpoint, manipulada 1):
 - **P1:** 45 °C constante.
-- **P2:** 55 °C que baja a 35 °C cuando el lote llega a 30 % b.h.
-- **P3:** 35 °C que sube a 55 °C cuando el lote llega a 30 % b.h.
+- **P2:** 50 °C que baja a 35 °C cuando el lote llega a 30 % b.h.
+- **P3:** 35 °C que sube a 50 °C cuando el lote llega a 30 % b.h.
+
+(Corrección del 21 oct 2026: el diseño inicial usaba 55 °C en P2/P3, que excede el
+límite de 50 °C del grano; se corrigió y se repitieron piloto y campaña con las
+mismas semillas. Resultados del diseño inicial en `resultados/diseno_inicial_55/`.)
 
 Factor B, caudal (manipulada 2), constante en todo el secado: **30 %, 75 % y 100 %** de 8 m³/min.
 
 Justificación de los niveles (detalle en `perfiles_termicos.py`):
-- 35, 45 y 55 °C son niveles equidistantes alrededor de los 50 °C de Cenicafé.
-  55 °C es el límite de la isoterma medida (Trejos et al., 1989).
+- 35 °C es el nivel más bajo de de Oliveira et al. (2018); 50 °C el máximo permitido
+  para el grano (González et al., 2010) y el nivel alto de la fuente; 45 °C el
+  nivel constante intermedio. Qué pregunta responde cada perfil: `perfiles_termicos.py`.
 - Los escalones en ambos sentidos con cambio al 30 % b.h. siguen el diseño de
   de Oliveira et al. (2018).
 - El caudal va del mínimo de operación del ventilador al óptimo de Cenicafé.
@@ -352,39 +357,36 @@ continúa donde iba.
   https://doi.org/10.4025/actasciagron.v39i2.31065
 - Gallego, C. P., Imbachi, L. C., & Osorio, V. (2023). *Cenicafé, 74*(1), e74107.
 
-## 8. Resultado de la campaña (5 oct 2026)
+## 8. Resultado de la campaña (diseño corregido, 21 oct 2026)
 
-**Piloto** (semillas 1–10, `resultados/piloto/calculo_N.md`):
-N_potencia = 12 (ACTIVA − REF: 102.6 h de diferencia media, σ_d = 12.5 h),
-N_precisión = 126 (la estrategia PASIVA es la más variable, DE 34.3 h),
-mínimo 30 → **N = 130**.
+El 21 oct 2026 se corrigieron P2 (50 → 35 °C) y P3 (35 → 50 °C), que en el diseño
+inicial llegaban a 55 °C y excedían el límite de 50 °C del grano. Se repitieron el
+piloto y la campaña con las mismas semillas. Las estrategias que no cambiaron
+(PASIVA, ACTIVA, REF, P1-*) reproducen la campaña anterior (diferencia < 1e-12). El
+resultado del diseño inicial (5 oct 2026) se conserva en `resultados/diseno_inicial_55/`.
 
-**Campaña** (semillas 1001–1150, `resultados/campana/`): se corrieron 130 y
-el criterio de convergencia (sección 3) mostró que la PASIVA quedaba en un
-semiancho de IC95 de 6.37 h, por encima de los 6 h fijados. Se agregaron 20
-realizaciones (mismo comando, la campaña continúa donde iba) → **N = 150**,
-con semiancho 5.74 h. Todas las estrategias cumplen ≤ 6 h y cambian menos de
-1.7 h entre el 80 % y el 100 % de las corridas.
+**Piloto** (semillas 1–10, `resultados/piloto/calculo_N.md`): N = max(12, 126, 30)
+→ **N = 130** (igual que antes). La campaña usa **N = 150**, igual que la anterior,
+porque con 130 la PASIVA no cumplía el criterio de convergencia (semiancho ≤ 6 h).
 
-Resultados principales (medias, 150 realizaciones):
+Resultados principales (medias, 150 realizaciones; detalle en
+`resultados/campana/resumen_resultados.md` y `resultados/r1/resumen_r1.md`):
 
 | Estrategia | Tiempo a 11 % b.h. [h] | Energía comprada [kWh/kg c.p.s.] | Filtro de calidad B |
 |---|---|---|---|
 | PASIVA | 258.2 | 0 | Cumple |
 | ACTIVA | 136.1 | 0.034 | Cumple |
-| REF (50 °C, caudal 100 %) | 32.4 | 1.757 | Cumple |
-| P1-C75 (45 °C, caudal 75 %) | 45.7 | 1.469 | Cumple |
-| P1-C100 (45 °C, caudal 100 %) | 41.0 | 1.814 | Cumple (dominado) |
-| P2 y P3 (escalonados) | 45.8–94.2 | 0.98–2.01 | No cumplen (grano > 50 °C) |
-| Caudal 30 % | 80–94 | 0.98–1.08 | No cumplen (sobresecado de capas) |
+| REF (50 °C, caudal 100 %) | 32.4 | 1.757 | Cumple (frontera) |
+| P1-C75 (45 °C, caudal 75 %) | 45.7 | 1.469 | Cumple (frontera) |
+| P3-C75 (35 → 50 °C, caudal 75 %) | 55.2 | 1.423 | Cumple (frontera) |
+| P1-C100, P2-C75, P2-C100, P3-C100 | 41.0–63.6 | 1.62–2.04 | Cumplen (dominados) |
+| Caudal 30 % (P1, P2, P3) | 80–99 | 0.99–1.07 | No cumplen (sobresecado de la capa de entrada) |
 
-Frontera de Pareto (tiempo vs. energía) entre los que cumplen: **REF** (el más
-rápido) y **P1-C75** (16 % menos energía, 13 h más). Las comparaciones
-pareadas (Wilcoxon con corrección de Holm) y las figuras están en
-`resultados/campana/`.
-
-Pendiente de decidir con el asesor: análisis de sensibilidad climática
-(escenario más variable / cosecha más húmeda) o declararlo como limitación.
+Ningún perfil supera 50 °C de grano. Frontera de Pareto (tiempo vs. energía) entre
+los que cumplen: **REF** (el más rápido), **P1-C75** (16,4 % menos energía, 13,3 h
+más) y **P3-C75** (19,0 % menos energía, 22,8 h más). P3 (bajo → alto) es más rápido
+y gasta menos que P2 (alto → bajo) con el mismo caudal. Las comparaciones pareadas
+(Wilcoxon con corrección de Holm) y las figuras están en `resultados/campana/`.
 
 ## Pendiente (histórico; ver sección 7)
 

@@ -18,12 +18,12 @@ Realizaciones del piloto: **10** (semillas 1–10).
 | P1-C30 (45 °C constante, caudal 30 %) | 81.2 | 2.51 | 1 |
 | P1-C75 (45 °C constante, caudal 75 %) | 46.0 | 1.40 | 1 |
 | P1-C100 (45 °C constante, caudal 100 %) | 41.2 | 1.22 | 1 |
-| P2-C30 (55 → 35 °C al 30 % b.h., caudal 30 %) | 94.4 | 2.33 | 1 |
-| P2-C75 (55 → 35 °C al 30 % b.h., caudal 75 %) | 59.8 | 1.48 | 1 |
-| P2-C100 (55 → 35 °C al 30 % b.h., caudal 100 %) | 55.3 | 1.46 | 1 |
-| P3-C30 (35 → 55 °C al 30 % b.h., caudal 30 %) | 95.8 | 3.96 | 2 |
-| P3-C75 (35 → 55 °C al 30 % b.h., caudal 75 %) | 52.1 | 2.15 | 1 |
-| P3-C100 (35 → 55 °C al 30 % b.h., caudal 100 %) | 46.2 | 1.93 | 1 |
+| P2-C30 (50 → 35 °C al 30 % b.h., caudal 30 %) | 99.4 | 2.76 | 1 |
+| P2-C75 (50 → 35 °C al 30 % b.h., caudal 75 %) | 63.0 | 1.55 | 1 |
+| P2-C100 (50 → 35 °C al 30 % b.h., caudal 100 %) | 58.1 | 1.49 | 1 |
+| P3-C30 (35 → 50 °C al 30 % b.h., caudal 30 %) | 100.2 | 4.04 | 2 |
+| P3-C75 (35 → 50 °C al 30 % b.h., caudal 75 %) | 55.6 | 2.14 | 1 |
+| P3-C100 (35 → 50 °C al 30 % b.h., caudal 100 %) | 49.5 | 1.94 | 1 |
 
 ## 3. Resultado
 

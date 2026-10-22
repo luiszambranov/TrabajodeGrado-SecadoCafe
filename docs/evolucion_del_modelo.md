@@ -72,6 +72,14 @@ al. (2010) controlan el caudal con variador para ahorrar energía. Rango 30–10
 
 P1 45 °C constante; P2 55 → 35 °C y P3 35 → 55 °C con cambio al 30 % b.h. (de
 Oliveira et al., 2018); caudal 30/75/100 %; REF = 50 °C y 100 % (Cenicafé).
+
+### 6b. Corrección de los perfiles escalonados (21 oct 2026)
+
+El 55 °C de P2/P3 excedía el límite de 50 °C del grano que adopta el trabajo
+(González et al., 2010) y no correspondía a la fuente (de Oliveira et al., 2018,
+usó 50 → 35 y 35 → 50 °C). La campaña mostró 6–22 h de grano > 50 °C. Se
+corrigió a P2 50 → 35 °C y P3 35 → 50 °C y se repitieron el piloto y la campaña
+(mismas semillas). Resultados del diseño inicial: `python/resultados/diseno_inicial_55/`.
 Detalle en `python/perfiles_termicos.py`.
 
 ### 7. N de la campaña por potencia y precisión, no arbitrario

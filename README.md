@@ -33,8 +33,10 @@ en Chinchiná, Caldas, secado con tres estrategias que reciben **el mismo clima*
 | SUPERVISADA | Secador eléctrico de lecho de 20 cm, 6 kW, ventilador de caudal variable, supervisado por PLC | `python/secador_electrico.py`, `codesys/` |
 
 En la supervisada se comparan **perfiles térmicos**: REF (50 °C, práctica de
-Cenicafé) y un diseño factorial de 3 perfiles (45 °C constante, 55 → 35 °C,
-35 → 55 °C) × 3 caudales (30, 75 y 100 %).
+Cenicafé) y un diseño factorial de 3 perfiles (45 °C constante, 50 → 35 °C,
+35 → 50 °C) × 3 caudales (30, 75 y 100 %). El diseño inicial usaba 55 °C en los
+escalonados y se corrigió el 21 oct 2026 porque excedía el límite de 50 °C del
+grano (resultados del diseño inicial en `python/resultados/diseno_inicial_55/`).
 
 **Modelo:** cinética de Roa–Cenicafé (isoterma de Trejos et al., 1989 + capa
 delgada de SECAFÉ, Parra-Coronado et al., 2008) para las tres estrategias;

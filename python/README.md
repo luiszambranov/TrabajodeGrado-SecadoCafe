@@ -17,6 +17,12 @@ python modbus_server.py
 python modbus_server.py --factor-aceleracion 1 --lazo-termico plc   # verificación a tiempo real
 python modbus_server.py --plant toy                                 # solo prueba de comunicación
 python modbus_server.py --hora-inicio 8 --log-csv ensayo_F1.csv     # arranca a las 08:00 y registra cada ciclo
+python modbus_server.py --semilla 1001 --log-csv resultados/verificacion/V1001_REF.csv   # verificación vs. réplica
+
+# Cierre para radicación (cada uno escribe su resumen .md y su figura)
+python r1_analisis_pareado.py ; python r2_limites_actuacion.py ; python r3_sensibilidad_clima.py
+python sensibilidad_tornado.py ; python graficas_ensayos.py
+python compara_codesys_replica.py resultados/verificacion/V1001_REF.csv --semilla 1001 --perfil REF
 #   --post-ventilacion-min 10 (default): minutos de modelo de ventilación tras perder la comunicación
 
 # Ensayo de continuidad física (sin CODESYS): paro, enfriamiento y comunicación perdida
@@ -103,6 +109,19 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 | `validacion_modelo.py` | Validación contra 4 casos independientes (laboratorio, patio, secador de lecho Escafé, secado solar). Ver `../data/reference/validacion_modelo.md`. |
 | `graficas_perfiles.py` | Figuras de los perfiles térmicos con el instante de cambio (`../figures/`). |
 
+### Cierre para radicación (guía final, 21 oct 2026)
+
+| Archivo | Qué hace |
+|---|---|
+| `corrida_instrumentada.py` | Misma corrida que `simular_supervisada` (verificada: mismo tiempo y energía) registrando por minuto consigna, T obtenida, potencia, ciclo de trabajo, saturación y T máxima alcanzable. |
+| `niveles_clima.py` | Niveles de clima por percentiles 5/95 de NASA POWER (método delta, ventana 2 días) con consistencia psicrométrica; caso hipotético de helada. |
+| `r1_analisis_pareado.py` | R1: P1-C75 frente a REF por semilla (IC 95 %, bootstrap por pares, percentiles, COP/lote, criterio de calidad más estricto, Tabla 5 una fila por configuración). → `resultados/r1/` |
+| `r2_limites_actuacion.py` | R2: límites de actuación, saturación, consignas no alcanzables, sensibilidad a tensión y ventilador. → `resultados/r2/` |
+| `r3_sensibilidad_clima.py` | R3: 12 corridas dirigidas (C0, CT±, CH±, C*) × REF y P1-C75 + 4 solares. → `resultados/r3/` |
+| `sensibilidad_tornado.py` | Sensibilidad ±20 % de un factor a la vez (cinética, caudal, UA, espesor). → `resultados/sensibilidad/` |
+| `compara_codesys_replica.py` | Verificación CODESYS vs. réplica con la misma semilla (`modbus_server.py --semilla N`). |
+| `graficas_ensayos.py` | Tabla y figura de los ensayos de fallo F1–F5. → `resultados/ensayos/` |
+
 ### Resultados
 
 | Carpeta | Contenido |
@@ -119,7 +138,7 @@ generador_ambiente ─┬─> escenario_sol_abierto (PASIVA) ─┐
 - La validación muestra sesgos conocidos por tipo de secado
   (`../data/reference/validacion_modelo.md`); no cambian el orden de las
   estrategias.
-- Sensibilidad a climas extremos: pendiente (guía de cierre, R3).
+- Sensibilidad al clima: prueba dirigida p5/p95 (`r3_sensibilidad_clima.py`); fuera de ese rango, caso hipotético de helada en `r2_limites_actuacion.py`.
 - Reposo (ventilador apagado): tiro natural con resistencia lineal y
   pérdidas del lecho con h = 4 W/m²K, supuestos declarados con
   sensibilidad en `../data/reference/reposo_tiro_natural.md`. Tras la

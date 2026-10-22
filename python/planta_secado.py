@@ -143,6 +143,10 @@ class ParametrosModeloSecadoPlant:
     encendido, sigue este tiempo de MODELO para evacuar el calor del ducto
     (práctica de post-ventilación de calentadores de ducto; criterio propio
     declarado) y luego se apaga. 0 = todo apagado de inmediato."""
+    clima_desde_lote: bool = False
+    """Solo para la verificación CODESYS vs. réplica (``--semilla``): «Nuevo lote»
+    reinicia también el reloj del clima a ``hora_inicio_h``, para que el lote vea
+    la misma secuencia de días que la réplica de la campaña con esa semilla."""
 
 
 # Estado de la planta publicado a CODESYS (registro 35, 21 oct 2026)
@@ -204,6 +208,8 @@ class ModeloSecadoPlant(Plant):
         tiempos de lote/energía en cero. La cámara conserva su temperatura
         y el reloj de la planta y el clima siguen (21 oct 2026)."""
         self.secador.nuevo_lote(self.params.m0_bh_pct)
+        if self.params.clima_desde_lote:
+            self.secador.t_fisico_h = self.params.hora_inicio_h
         self._heater_on = 0
         self.t_proceso_h = 0.0
         self.t_secado_h = 0.0

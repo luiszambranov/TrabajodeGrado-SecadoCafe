@@ -119,7 +119,7 @@ Mapa de registros Modbus (holding registers, function code 03/06/16)
     26          setpoint_cmd  WORD (°C entero)  °C       CODESYS -> Python (19 oct 2026): consigna de
                                                            T_process que calcula el PLC según el perfil
                                                            térmico elegido en la HMI (REF 50, P1 45,
-                                                           P2 55->35, P3 35->55). La usa el termostato
+                                                           P2 50->35, P3 35->50; 21 oct 2026). La usa el termostato
                                                            local. 0 = no configurado -> 50 °C.
 
     Relojes y estado (21 oct 2026), todos Python -> CODESYS, horas de MODELO:
@@ -518,6 +518,9 @@ class RegistroCSV:
     def __init__(self, ruta: str) -> None:
         import csv
         import os
+        carpeta = os.path.dirname(ruta)
+        if carpeta:
+            os.makedirs(carpeta, exist_ok=True)   # crea resultados/... si no existe
         nuevo = not os.path.exists(ruta)
         self._f = open(ruta, "a", newline="", encoding="utf-8")
         self._w = csv.writer(self._f)
@@ -753,6 +756,10 @@ def main() -> None:
     parser.add_argument("--post-ventilacion-min", type=float, default=10.0,
                         help="Minutos de MODELO de post-ventilación al perder la comunicación (resistencia ya "
                              "apagada); 0 = todo apagado de inmediato (default 10)")
+    parser.add_argument("--semilla", type=int, default=None,
+                        help="Verificación CODESYS vs. réplica: usa el clima y la humedad inicial de la realización "
+                             "Monte Carlo con esta semilla (p. ej. 1001) y reinicia el reloj del clima con «Nuevo lote». "
+                             "Comparar después con compara_codesys_replica.py")
     parser.add_argument("--log-csv", default=None,
                         help="Ruta de un CSV con una fila por ciclo (relojes, estado, enlaces, comandos, "
                              "T, HR, humedad, potencia, energía). Evidencia de los ensayos F1-F5.")
@@ -766,8 +773,15 @@ def main() -> None:
         # completamente cargado) para evitar un import circular.
         from planta_secado import ModeloSecadoPlant, ParametrosModeloSecadoPlant
 
+        extra = {}
+        if args.semilla is not None:
+            from campana_montecarlo import realizacion
+            dias, m0 = realizacion(args.semilla)
+            extra = {"clima_dias": dias, "m0_bh_pct": m0, "clima_desde_lote": True}
+            log.info("Verificación: semilla %d (M0 = %.2f %% b.h., %d días de clima de la campaña)", args.semilla, m0, len(dias))
         plant: Plant = ModeloSecadoPlant(
             ParametrosModeloSecadoPlant(
+                **extra,
                 factor_aceleracion=args.factor_aceleracion,
                 lazo_termico=args.lazo_termico,
                 setpoint_c=args.setpoint,

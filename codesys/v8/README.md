@@ -124,6 +124,25 @@ El campo de «Tiempo de secado» que ya existe sigue en `PLC_PRG.tiempo_secado_h
 horas en RUN). Para la tendencia, agregar `T_ambiente` a la gráfica de temperatura sirve para
 que se vea el efecto día/noche.
 
+### 3.1 Selector de perfil y caudal (si viene de v6 hay que crearlo)
+
+El código solo copia `perfil_sel` → `perfil_activo` y `caudal_sel` → `caudal_activo` **en
+REPOSO**. Si la HMI no escribe en esas dos variables, el lote corre siempre con REF (50 °C, 100 %).
+
+| Elemento HMI | Propiedad «Variable» | Configuración |
+|---|---|---|
+| Cuadro combinado – entero (perfil) | `PLC_PRG.perfil_sel` | Lista de textos `TL_Perfiles`: ID `0` REF 50 °C, `1` P1 45 °C, `2` P2 50→35 °C, `3` P3 35→50 °C |
+| Cuadro combinado – entero (caudal) | `PLC_PRG.caudal_sel` | Lista de textos `TL_Caudal` con **ID = valor**: `30`, `75`, `100` (si los ID son 0/1/2 el PLC recibe 0/1/2 y lo limita a 30 %) |
+| Texto «Perfil activo» | `PLC_PRG.perfil_txt` | `%s` |
+| Campo «SetPoint» | `PLC_PRG.setpoint` | `%.1f` |
+
+Alternativa sin cuadro combinado: 4 botones en modo **«Asignar valor»** (Tap / Write value) que
+escriben 0, 1, 2, 3 en `PLC_PRG.perfil_sel`, y 3 que escriben 30, 75, 100 en `PLC_PRG.caudal_sel`.
+
+Prueba rápida para separar código de HMI: en el Watch, en REPOSO, escribir `perfil_sel = 1`
+(doble clic en «Valor preparado», Ctrl+F7). Si `setpoint` pasa a 45 y Python muestra SP45, el
+código está bien y el problema es el enlace del elemento de la HMI.
+
 ## 4. Política de parada (para la Tabla C1 del documento)
 
 | Situación | Resistencia | Ventilador | Planta Python |

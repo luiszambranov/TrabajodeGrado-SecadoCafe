@@ -2,7 +2,8 @@
 //   enlace FluidSIM hacia Python (registro 40). Python ya no congela la física en HOLD:
 //   con STOP, falla o fin de secado la planta sigue enfriándose y el clima sigue su ciclo.
 // PLC_PRG v7 (19 oct 2026): v6 + selección de PERFIL TÉRMICO y CAUDAL en la HMI.
-//   - perfil_sel (HMI): 0 = REF 50 °C, 1 = P1 45 °C, 2 = P2 55 -> 35 °C, 3 = P3 35 -> 55 °C.
+//   - perfil_sel (HMI): 0 = REF 50 °C, 1 = P1 45 °C, 2 = P2 50 -> 35 °C, 3 = P3 35 -> 50 °C (corregido 21 oct 2026:
+//     el diseño inicial usaba 55 °C y excedía el límite de 50 °C del grano).
 //     El cambio de P2/P3 ocurre cuando la humedad PROMEDIO del lote llega a 30 % b.h.
 //     (de Oliveira et al., 2018; diseño en python/perfiles_termicos.py).
 //   - caudal_sel (HMI): 30, 75 o 100 %.
@@ -111,7 +112,7 @@ VAR
     fluidsim_estado_cmd : WORD;                // canal FC06, dir 40: estado del enlace FluidSIM hacia Python
     fluidsim_txt      : STRING(20);
     datos_validos     : BOOL;                  // v8 (R5): FALSE = sin comunicación con Python, valores vencidos
-    txt_datos         : STRING(40);            // v8 (R5): aviso para la HMI
+    txt_datos         : STRING(60);            // v8 (R5): aviso para la HMI
     hh                : INT;
     mm                : INT;
 
@@ -240,8 +241,8 @@ END_IF
 CASE perfil_activo OF
     0: sp_inicial := 50.0; sp_final := 50.0; perfil_txt := 'REF: 50 C constante';
     1: sp_inicial := 45.0; sp_final := 45.0; perfil_txt := 'P1: 45 C constante';
-    2: sp_inicial := 55.0; sp_final := 35.0; perfil_txt := 'P2: 55 C -> 35 C al 30 % b.h.';
-    3: sp_inicial := 35.0; sp_final := 55.0; perfil_txt := 'P3: 35 C -> 55 C al 30 % b.h.';
+    2: sp_inicial := 50.0; sp_final := 35.0; perfil_txt := 'P2: 50 C -> 35 C al 30 % b.h.';
+    3: sp_inicial := 35.0; sp_final := 50.0; perfil_txt := 'P3: 35 C -> 50 C al 30 % b.h.';
 END_CASE
 
 // Cambio al 30 % b.h. (humedad promedio). Se enclava: no vuelve atrás en el mismo lote.

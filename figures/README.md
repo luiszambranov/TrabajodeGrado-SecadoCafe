@@ -12,3 +12,9 @@ Figuras para el documento final. Se regeneran con `python/graficas_perfiles.py`.
 Caso determinista: día nominal de Chinchiná y M0 = 55 % b.h. Las figuras de
 la campaña Monte Carlo (convergencia, cajas, Pareto) están en
 `python/resultados/campana/`. El diagrama de la simulación está en `docs/`.
+
+## Capturas de la HMI de CODESYS (22 oct 2026)
+
+| Archivo | Contenido |
+|---|---|
+| `hmi_secado_terminado_REF.png` | HMI v8 al terminar un lote REF (50 °C, 100 %): piloto «Secado terminado», «Bandeja adentro», «Aire invertido», comunicación con Python OK, selector de perfil y caudal. **Provisional:** la tendencia de temperatura del aire está vacía (Trace detenida) y la de humedad no muestra el lote desde t = 0; para R5 se reemplaza por la captura con la tendencia completa. |

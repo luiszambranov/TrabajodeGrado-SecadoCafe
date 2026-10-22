@@ -19,7 +19,7 @@ y HMI. Estado al 21 oct 2026: HMI final con FluidSIM; v8 con relojes de la plant
 | `ModbusPhytoon.project` | Proyecto v0 (SP15, 10 sept 2026), ya no instalado. Histórico. |
 | `comunicacion_modbus.md` | Guía paso a paso del cliente Modbus en CODESYS, código ST y **sección 0 con los errores que más tiempo costaron** (léela si algo deja de funcionar). Secciones 7–8: lazo térmico local y caudal variable. Es una bitácora: conserva el historial de cada cambio. |
 | `evidencia_*.png`, `ConcexionOPC.png` | Evidencias de comunicación, HMI, watchdog y prueba OPC con FluidSIM. |
-| `evidencia_hmi_v7_reposo_P2.png` | HMI final (v7, 19 oct 2026) en REPOSO con perfil P2 (55 → 35 °C) y caudal 100 % seleccionados: Setpoint 55 °C, tiempo y energía en 0 (captura del 19 oct 2026, cuando el modelo aún se congelaba antes de START; desde el 21 oct la física avanza también en REPOSO). |
+| `evidencia_hmi_v7_reposo_P2.png` | HMI final (v7, 19 oct 2026) en REPOSO con perfil P2 (55 → 35 °C, diseño inicial; desde el 21 oct 2026 es 50 → 35 °C) y caudal 100 % seleccionados: Setpoint 55 °C, tiempo y energía en 0 (captura del 19 oct 2026, cuando el modelo aún se congelaba antes de START; desde el 21 oct la física avanza también en REPOSO). |
 | `evidencia_hmi_v7_secado_P2_55C.png` | HMI final (v7) en SECADO, perfil P2 y caudal 100 %: T aire 54,7 °C frente a setpoint 55 °C, ciclo de resistencia 86 %, caudal 8,0 m³/min, 1,8 h y 1,8 kWh; semáforo verde, ventilador y resistencias encendidos. |
 | `evidencia_fluidsim_circuito_v7.png` | Circuito FluidSIM conectado por OPC (`CoDeSys.OPC.DA`): cilindros de compuerta (1B1/1B2) y bandeja (2B1/2B2) con válvulas 5/2 biestables, pulsadores EMERGENCIA/START/STOP, relé K1 del ventilador y semáforo; bloques FluidSIM Out → `GVL_SECUENCIA.INPUT0` y FluidSIM In ← `GVL_SECUENCIA.OUTPUT0`. |
 
@@ -30,7 +30,7 @@ Mapa de registros y variables: `../docs/tabla_variables.md`.
 1. `cd python` y `python modbus_server.py` (modelo, factor 540, puerto 5020). El servidor arranca en HOLD: resistencia y ventilador apagados; la física y el reloj de la planta avanzan (21 oct 2026).
 2. En CODESYS: cliente Modbus en `127.0.0.1:5020` (27 registros; canal nuevo `setpoint_cmd`, FC06, 16#001A). Compilar, iniciar sesión, **Reiniciar en frío** y RUN. MainTask: `PLC_PRG` y luego `SECUENCIA`.
 3. FluidSIM con el circuito de `../fluidsim/` en simulación y `GVL_SECUENCIA.sin_fluidsim := FALSE` (en TRUE el PLC simula pulsadores y cilindros para probar sin FluidSIM).
-4. En la HMI, en REPOSO: elegir perfil (lista `TL_Perfiles`, ID 0–3 → `PLC_PRG.perfil_sel`) y caudal (`PLC_PRG.caudal_sel`, 30/75/100) y pulsar START. Con P2 la consigna pasa de 55 a 35 °C al bajar de 30 % b.h.
+4. En la HMI, en REPOSO: elegir perfil (lista `TL_Perfiles`, ID 0–3 → `PLC_PRG.perfil_sel`) y caudal (`PLC_PRG.caudal_sel`, 30/75/100) y pulsar START. Con P2 la consigna pasa de 50 a 35 °C al bajar de 30 % b.h. y con P3 de 35 a 50 °C (corregido 21 oct 2026). **Si el selector no cambia la consigna:** ver `v8/README.md`, sección «Selector de perfil y caudal».
 5. STOP (HMI o FluidSIM) → PARO: resistencia y ventilador apagados, la cámara y el café se enfrían (la física no se congela desde el 21 oct 2026); START reanuda.
 6. Verificación a tiempo real (opcional, ~60 min): `python modbus_server.py --factor-aceleracion 1 --lazo-termico plc` y `lazo_local := FALSE`; comparar T_process y energía con `python/control_supervisado.py`.
 

@@ -1,11 +1,11 @@
 {
-  "fecha_inicio": "2026-10-05T20:37:22",
-  "comando": "campana_montecarlo.py --n 10 --semilla-inicial 1 --salida resultados/piloto --procesos 4",
-  "git_commit": "a6a633d77026f46e85773b078bda0c190f947e0d",
-  "python": "3.14.7",
-  "numpy": "2.5.2",
+  "fecha_inicio": "2026-10-21T20:06:56",
+  "comando": "campana_montecarlo.py --n 10 --semilla-inicial 1 --salida resultados/piloto --procesos 2",
+  "git_commit": "desconocido",
+  "python": "3.13.16",
+  "numpy": "2.5.3",
   "scipy": "1.18.1",
-  "sistema": "Windows-11-10.0.26200-SP0",
+  "sistema": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39",
   "semillas": [
     1,
     10
@@ -67,49 +67,49 @@
     },
     {
       "codigo": "P2-C30",
-      "nombre": "55 → 35 °C al 30 % b.h., caudal 30 %",
-      "sp_inicial_c": 55.0,
+      "nombre": "50 → 35 °C al 30 % b.h., caudal 30 %",
+      "sp_inicial_c": 50.0,
       "sp_final_c": 35.0,
       "caudal_frac": 0.3,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     },
     {
       "codigo": "P2-C75",
-      "nombre": "55 → 35 °C al 30 % b.h., caudal 75 %",
-      "sp_inicial_c": 55.0,
+      "nombre": "50 → 35 °C al 30 % b.h., caudal 75 %",
+      "sp_inicial_c": 50.0,
       "sp_final_c": 35.0,
       "caudal_frac": 0.75,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     },
     {
       "codigo": "P2-C100",
-      "nombre": "55 → 35 °C al 30 % b.h., caudal 100 %",
-      "sp_inicial_c": 55.0,
+      "nombre": "50 → 35 °C al 30 % b.h., caudal 100 %",
+      "sp_inicial_c": 50.0,
       "sp_final_c": 35.0,
       "caudal_frac": 1.0,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     },
     {
       "codigo": "P3-C30",
-      "nombre": "35 → 55 °C al 30 % b.h., caudal 30 %",
+      "nombre": "35 → 50 °C al 30 % b.h., caudal 30 %",
       "sp_inicial_c": 35.0,
-      "sp_final_c": 55.0,
+      "sp_final_c": 50.0,
       "caudal_frac": 0.3,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     },
     {
       "codigo": "P3-C75",
-      "nombre": "35 → 55 °C al 30 % b.h., caudal 75 %",
+      "nombre": "35 → 50 °C al 30 % b.h., caudal 75 %",
       "sp_inicial_c": 35.0,
-      "sp_final_c": 55.0,
+      "sp_final_c": 50.0,
       "caudal_frac": 0.75,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     },
     {
       "codigo": "P3-C100",
-      "nombre": "35 → 55 °C al 30 % b.h., caudal 100 %",
+      "nombre": "35 → 50 °C al 30 % b.h., caudal 100 %",
       "sp_inicial_c": 35.0,
-      "sp_final_c": 55.0,
+      "sp_final_c": 50.0,
       "caudal_frac": 1.0,
       "fuente": "de Oliveira et al. (2018); González et al. (2010)"
     }

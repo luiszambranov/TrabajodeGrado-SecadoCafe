@@ -15,7 +15,7 @@ actualiza aquí.
 | **Controlada (criterio de parada)** | Humedad del café: promedio del lote `M_coffee` y capa más húmeda `M_coffee_max` | % b.h. | Parada con promedio ≤ 11 % **y** capa más húmeda ≤ 12 % |
 | **Manipulada 1** | Potencia de la resistencia (encendida/apagada, 6 kW), `heater_cmd` / `heater_duty` | – / % | Lazo térmico |
 | **Manipulada 2** | Caudal del ventilador, `fan_speed_pct` → `caudal` | % / m³/min | Elegido en la HMI antes de START (30, 75 o 100 % de 8 m³/min), fijo durante el lote |
-| **Referencia** | Consigna de temperatura `setpoint_cmd` | °C | Perfil elegido en la HMI (REF 50, P1 45, P2 55→35, P3 35→55 °C; cambio al 30 % b.h.) |
+| **Referencia** | Consigna de temperatura `setpoint_cmd` | °C | Perfil elegido en la HMI (REF 50, P1 45, P2 50→35, P3 35→50 °C; cambio al 30 % b.h.; corregido el 21 oct 2026, antes 55 °C) |
 | **Manipulada discreta** | Sentido del aire en el lecho, `flow_dir_cmd` | 0/1 | Inversión cada 6 h (SECAFÉ, 2008) |
 | **Perturbación** | Temperatura ambiente | °C | Clima de Chinchiná (Naranjal + NASA POWER), aleatorio día a día |
 | **Perturbación** | Humedad relativa ambiente `RH_ambient` (vía presión de vapor `ea`) | % | Ídem |
@@ -52,7 +52,7 @@ palabra **baja** en `words[0]` (ver `codesys/comunicacion_modbus.md`, sección 0
 | 21 | `reset_lote_cmd` | WORD 0/1 | – | CODESYS → Python | pulso de 3 s (flanco 0→1 = nuevo lote) | `reset_lote_cmd` (v5) |
 | 22–23 | `caudal` | REAL | m³/min | Python → CODESYS | 0–8 | `caudal_m3_min` |
 | 24–25 | `energia_kWh` | REAL | kWh | Python → CODESYS | 0–~150 por lote | `energia_kWh` (v5) |
-| 26 | `setpoint_cmd` | WORD | °C enteros | CODESYS → Python | 35–55 (0 = 50 °C por defecto) | `setpoint_cmd` (v7) |
+| 26 | `setpoint_cmd` | WORD | °C enteros | CODESYS → Python | 35–50 (0 = 50 °C por defecto) | `setpoint_cmd` (v7) |
 | 27–28 | `tiempo_lote_h` | REAL | h de modelo desde "Nuevo lote" (incluye paradas) | Python → CODESYS | 0–200 | `t_lote_raw` (v8) |
 | 29–30 | `tiempo_secado_h` | REAL | h con calentamiento permitido (secado efectivo); reloj de inversión desde v8 | Python → CODESYS | 0–100 | `t_secado_ef_raw` (v8) |
 | 31–32 | `tiempo_parado_h` | REAL | h del lote sin RUN (paro, falla, fin, reposo) | Python → CODESYS | 0–200 | `t_parado_raw` (v8) |
