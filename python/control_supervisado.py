@@ -6,7 +6,7 @@ Réplica en Python de la lógica de control de CODESYS (PLC_PRG) para la
 propuesta supervisada, usada en la campaña Monte Carlo.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
-Por qué existe (29 sept 2026)
+Por qué existe
 ------------------------------
 La campaña Monte Carlo no pasa por CODESYS/Modbus: (1) con el PLC en el
 lazo, la misma semilla no da exactamente el mismo resultado (tiempos de
@@ -31,7 +31,7 @@ Transición SECANDO -> FIN cuando M_coffee (promedio) <= 11 % b.h. Y la
 capa más húmeda <= 12 % b.h.:
     fan_cmd := 0; heater_cmd := 0
 
-Cambios que el PLC debe tener para coincidir (ver comunicacion_modbus.md):
+Lo que comparte con el PLC (codesys/PLC_PRG.st y SECUENCIA.st):
     - fan_cmd encendido durante todo el secado;
     - enclavamiento heater AND fan;
     - parada automática a M_coffee <= 11 % b.h.
@@ -73,7 +73,7 @@ class ParametrosControl:
     dt_ciclo_s: float = 1.0           # ciclo del lazo térmico: 1 s, igual al periodo
                                       # del servidor Modbus (modbus_server --periodo 1.0)
     caudal_frac: object = 1.0
-    """Manipulada 2 (5 oct 2026): fracción del caudal nominal. Un número fijo
+    """Manipulada 2: fracción del caudal nominal. Un número fijo
     (1.0 = 8 m3/min, 0.1 m3/min/kg; González et al., 2010) o una función
     f(t_h, m_prom_bh, m_max_bh) -> fracción, para perfiles de caudal. Se
     recorta a [ParametrosSecador.caudal_min_frac, 1]."""
@@ -121,7 +121,7 @@ def simular_supervisada(
 
     def todo_nada(t_process: float) -> int:
         # Mismo criterio que PLC_PRG, evaluado en cada ciclo; además acumula
-        # las métricas de control de la Guía (sección 11): IAE, ISE,
+        # las métricas de control: IAE, ISE,
         # sobreimpulso y error medio en régimen.
         sp = st["sp"]
         err = sp - t_process

@@ -3,8 +3,7 @@ planta_secado.py
 ==================
 
 ModeloSecadoPlant: implementacion de la interfaz modular ``Plant`` (ver
-modbus_server.py) que reemplaza a ToyPlant por el modelo real de secado
-del proyecto, cerrando el lazo:
+modbus_server.py) con el modelo de secado del proyecto, que cierra el lazo:
 
     heater_cmd/fan_cmd -> secador_electrico.SecadorElectrico
                           (plenum con resistencia de 6 kW, dinamica_termica.py
@@ -12,10 +11,10 @@ del proyecto, cerrando el lazo:
                            Thompson + Roa-Cenicafe) -> T_process, RH_process,
                            M_coffee
 
-Configuracion (vigente desde el 29 sept 2026): lote de 80 kg c.p.s.,
+Configuracion: lote de 80 kg c.p.s.,
 M0 = 55 % b.h., resistencia electrica de 6 kW con enclavamiento de flujo
 (heater AND fan), caudal nominal 0.1 m3/min/kg (8 m3/min, variable de 30
-a 100 % desde el 5 oct 2026) y lecho de 20 cm (Gonzalez et al., 2010). La
+a 100 %) y lecho de 20 cm (Gonzalez et al., 2010). La
 fisica vive en secador_electrico.py y es la MISMA que usa la replica de
 control en Python (control_supervisado.py) de la campana Monte Carlo.
 Publica RH_ambient (aire exterior) y RH_process (aire de la camara) por
@@ -24,12 +23,7 @@ recibir la misma realizacion Monte Carlo que las lineas base.
 
 Trabajo de grado - Sistema de supervision digital para el secado de cafe.
 
-Historial: el 23 sept 2026 esta clase reemplazo a ToyPlant con un primer
-modelo (Midilli modificado de Phitakwinai et al., 2019, hoy en
-python/legacy/); el 29 sept 2026 se paso al modelo unico de Roa-Cenicafe
-y al secador dimensionado con fuentes
-(data/reference/secador_electrico_dimensionamiento.md). Ver
-docs/evolucion_del_modelo.md.
+Dimensionamiento del secador: data/reference/secador_electrico_dimensionamiento.md.
 
 Factor de aceleracion temporal
 ----------------------------------
@@ -46,18 +40,17 @@ segundos) en horas de modelo:
 Valor de uso con el HMI: factor 540 (default de modbus_server.py), es
 decir 0.15 h de modelo por segundo real; un secado de ~32 h se ve en
 ~3.5 min. Como el plenum tiene una constante de tiempo de ~106 s, con
-ese factor el termostato no puede cerrarse desde CODESYS (ver la
-correccion del 4 oct 2026, abajo). La verificacion CODESYS vs. replica
+ese factor el termostato no puede cerrarse desde CODESYS (ver
+"Lazo termico local", abajo). La verificacion CODESYS vs. replica
 se hace a tiempo real (--factor-aceleracion 1 --lazo-termico plc)
 durante una ventana corta (~60 min), comparando T_process y la energia
 de la resistencia.
 
-CORRECCION 4 oct 2026 -- lazo termico local (prueba con el tutor)
---------------------------------------------------------------------
-Sintoma observado: con --factor-aceleracion 540 (0.15 h de modelo por
-segundo) T_process alternaba 22 C <-> 65 C en cada ciclo, RH_process
-7 % <-> 68 %, y el lecho recibia aire a 65 C la mitad del tiempo
-(resultado de secado invalido: grano > 50 C).
+Lazo termico local
+------------------
+Motivo: si CODESYS cerrara el termostato con --factor-aceleracion 540 (0.15 h de modelo por
+segundo) T_process alternaria 22 C <-> 65 C en cada ciclo y el lecho
+recibiria aire a 65 C la mitad del tiempo (grano > 50 C).
 
 Causa: problema de MUESTREO, no de la fisica. El plenum tiene una
 constante de tiempo tau = C/(m*cp) ~ 15/0.14 ~ 107 s, pero CODESYS solo
@@ -86,8 +79,7 @@ Solucion (arquitectura en dos niveles, como en un secador real):
       registra en el log); la resistencia la habilitan fan_cmd=1 y
       plant_mode=RUN. Python publica el ciclo de trabajo de la
       resistencia (heater_duty_pct, registros 18-19) para el HMI.
-    - lazo_termico='plc' conserva el comportamiento anterior (CODESYS
-      decide heater_cmd) y es el modo correcto para la verificacion a
+    - lazo_termico='plc': CODESYS decide heater_cmd y es el modo correcto para la verificacion a
       tiempo real (--factor-aceleracion 1).
     - lazo_termico='auto' (por defecto) elige 'plc' si el paso de
       modelo por ciclo es <= tau/10 (~10 s) y 'local' en otro caso.
@@ -128,17 +120,17 @@ class ParametrosModeloSecadoPlant:
     # None -> [condiciones_nominales()] (repite el dia nominal). Para
     # Monte Carlo: la MISMA lista de dias que reciben las lineas base.
     lazo_termico: str = "auto"
-    # 'auto' | 'plc' | 'local' -- ver "CORRECCION 4 oct 2026" arriba.
+    # 'auto' | 'plc' | 'local' -- ver "Lazo termico local" arriba.
     setpoint_c: float = 50.0          # termostato local (Gonzalez et al., 2010)
     histeresis_c: float = 0.0         # igual a control_supervisado.ParametrosControl
     dt_lecho_h: float = 1.0 / 60.0    # sub-paso del lecho: 1 min (igual a la replica)
     dt_ciclo_s: float = 1.0           # ciclo del termostato local [s de modelo]
     hora_inicio_h: float = 0.0
-    """Hora del día (0-24) en que arranca la planta (21 oct 2026). 0 =
+    """Hora del día (0-24) en que arranca la planta. 0 =
     medianoche, igual que la campaña Monte Carlo (necesario para comparar
     CODESYS contra la réplica con la misma semilla)."""
     post_ventilacion_h: float = 10.0 / 60.0
-    """Política de fallo local (21 oct 2026): al perder la comunicación con
+    """Política de fallo local: al perder la comunicación con
     CODESYS la resistencia se apaga de inmediato y el ventilador, si venía
     encendido, sigue este tiempo de MODELO para evacuar el calor del ducto
     (práctica de post-ventilación de calentadores de ducto; criterio propio
@@ -149,7 +141,7 @@ class ParametrosModeloSecadoPlant:
     la misma secuencia de días que la réplica de la campaña con esa semilla."""
 
 
-# Estado de la planta publicado a CODESYS (registro 35, 21 oct 2026)
+# Estado de la planta publicado a CODESYS (registro 35)
 ESTADO_REPOSO = 0        # HOLD: ventilador y resistencia apagados (la física sigue)
 ESTADO_SECANDO = 1       # RUN con calentamiento permitido (SECADO / INVERSION)
 ESTADO_VENTILANDO = 2    # RUN sin calentamiento (ENFRIAMIENTO)
@@ -165,7 +157,7 @@ class ModeloSecadoPlant(Plant):
     solo traduce comandos Modbus (heater_cmd, fan_cmd, plant_mode) y
     publica las salidas.
 
-    21 oct 2026 (guía de cierre, R4): la planta NUNCA se congela. Con
+    La planta nunca se congela. Con
     HOLD, fin de secado o comunicación perdida solo cambian los comandos
     (resistencia apagada, ventilador según la política de fallo); el
     tiempo físico, el clima día/noche, el enfriamiento y el secado
@@ -184,7 +176,7 @@ class ModeloSecadoPlant(Plant):
         self.secador = SecadorElectrico(self.params.clima_dias, self.params.secador, self.params.m0_bh_pct,
                                         t_inicio_h=self.params.hora_inicio_h)
         self._heater_on = 0
-        self._sp_plc_c = 0.0   # consigna recibida del PLC (19 oct 2026); 0 = usar params.setpoint_c
+        self._sp_plc_c = 0.0   # consigna recibida del PLC; 0 = usar params.setpoint_c
         self.modo_lazo = self._resolver_modo(periodo_s)
         self.t_planta_h = 0.0
         self.t_proceso_h = 0.0
@@ -206,7 +198,7 @@ class ModeloSecadoPlant(Plant):
     def reset_lote(self) -> None:
         """Nuevo lote (registro 21): café nuevo con la humedad inicial y
         tiempos de lote/energía en cero. La cámara conserva su temperatura
-        y el reloj de la planta y el clima siguen (21 oct 2026)."""
+        y el reloj de la planta y el clima siguen."""
         self.secador.nuevo_lote(self.params.m0_bh_pct)
         if self.params.clima_desde_lote:
             self.secador.t_fisico_h = self.params.hora_inicio_h
@@ -231,7 +223,7 @@ class ModeloSecadoPlant(Plant):
 
     def _termostato(self, t_process: float) -> int:
         """Todo/nada local, mismo criterio que control_supervisado.todo_nada."""
-        # 19 oct 2026: la consigna la decide el PLC (perfil térmico de la HMI,
+        # la consigna la decide el PLC (perfil térmico de la HMI,
         # registro 26); si no llega (0), se usa la de los parámetros (50 °C).
         sp = self._sp_plc_c if self._sp_plc_c > 0 else self.params.setpoint_c
         hy = self.params.histeresis_c
@@ -252,7 +244,7 @@ class ModeloSecadoPlant(Plant):
             self._sp_plc_c = inputs.setpoint_c
 
         run = inputs.plant_mode != PLANT_MODE_HOLD
-        # Manipulada 2 (5 oct 2026): 0 = CODESYS no la configura -> 100 %.
+        # Manipulada 2: 0 = CODESYS no la configura -> 100 %.
         fan_frac = inputs.fan_speed_pct / 100.0 if inputs.fan_speed_pct > 0 else 1.0
 
         if inputs.comm_lost:
@@ -275,11 +267,10 @@ class ModeloSecadoPlant(Plant):
             heater_cmd = inputs.heater_cmd if run else 0
             # En lazo local heater_cmd de CODESYS es el PERMISO de calentar
             # (en_marcha AND calentar): en ENFRIAMIENTO el ventilador sigue
-            # pero la resistencia no puede encender (corregido 21 oct 2026;
-            # antes el termostato local calentaba también en ENFRIAMIENTO).
+            # pero la resistencia no puede encender.
             permiso_calor = bool(run and fan_cmd and inputs.heater_cmd)
             flujo_invertido = bool(inputs.flow_dir_cmd) and run
-            # Ensayo F2 (21 oct 2026): con el enlace FluidSIM caído (registro
+            # Ensayo F2: con el enlace FluidSIM caído (registro
             # 40 = 3) el sentido que llega no está confirmado por un final de
             # carrera vivo: se conserva el último válido y no se inventa uno.
             if inputs.fluidsim_estado == 3:
@@ -348,7 +339,7 @@ class ModeloSecadoPlant(Plant):
 if __name__ == "__main__":
     # Smoke test: emula al servidor (periodo 1 s) con factor 540 y el
     # todo/nada de CODESYS escribiendo heater_cmd cada ciclo. En modo
-    # 'plc' reproduce la falla del 4 oct 2026 (22 <-> 65 C); en modo
+    # 'plc' con factor alto oscila 22 <-> 65 C; en modo
     # 'local' T_process debe quedarse en ~50 C.
     from modbus_server import PLANT_MODE_RUN
 

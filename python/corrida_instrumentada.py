@@ -4,8 +4,7 @@ corrida_instrumentada.py
 
 Misma corrida que ``control_supervisado.simular_supervisada`` (misma física de
 ``secador_electrico.py``, mismo todo/nada cada 1 s, misma inversión cada 6 h y
-mismo criterio de fin), pero registrando minuto a minuto lo que pide la guía de
-cierre (R2/R3): consigna, temperatura OBTENIDA, potencia realmente aplicada,
+mismo criterio de fin), pero registrando minuto a minuto la actuación: consigna, temperatura OBTENIDA, potencia realmente aplicada,
 ciclo de trabajo, saturación de la resistencia y margen físico frente a la
 consigna. Se verifica contra ``simular_supervisada`` en ``__main__``.
 
@@ -50,7 +49,7 @@ class ResultadoInstrumentado:
     horas_fuera_rango: float
     traza: list = field(default_factory=list)   # dicts por minuto
 
-    # --- métricas de actuación (R2) ---
+    # --- métricas de actuación ---
     def metricas(self, excluir_arranque_h: float = 0.25) -> dict:
         """Métricas de régimen: se excluyen los primeros ``excluir_arranque_h`` y el
         mismo lapso tras cada cambio de consigna (P2/P3); esos transitorios se

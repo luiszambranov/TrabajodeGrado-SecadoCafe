@@ -3,7 +3,7 @@ sensibilidad_tornado.py
 ========================
 
 Sensibilidad de un factor a la vez (tipo tornado) a los parámetros más
-inciertos del modelo, recomendada por el evaluador (§3.6): la incertidumbre del
+inciertos del modelo: la incertidumbre del
 tiempo ABSOLUTO del modelo es grande (validación V3: −45 % a +80 %), pero lo que
 importa para el objetivo 3 es si la comparación RELATIVA P1-C75 frente a REF se
 mantiene. Se varía cada parámetro ±20 % y se repite el diseño pareado.
@@ -98,7 +98,7 @@ def main() -> None:
             "capa_min_REF": np.mean([a[k]["capa_min"] for k in SEMILLAS]), "capa_min_P1": np.mean([b[k]["capa_min"] for k in SEMILLAS]),
         })
     base = filas[0]
-    L = ["# Sensibilidad tipo tornado ±20 % (21 oct 2026)", "",
+    L = ["# Sensibilidad tipo tornado ±20 %", "",
          "Generado por `python/sensibilidad_tornado.py`: 10 realizaciones de la campaña (semillas 1001–1010) × "
          "REF y P1-C75 × (base + 8 variantes) = 180 corridas pareadas. Un factor a la vez.", "",
          "| Parámetro | Factor | t REF [h] | t P1-C75 [h] | kWh/kg REF | kWh/kg P1-C75 | Ahorro medio [%] | Ahorro mínimo [%] | "

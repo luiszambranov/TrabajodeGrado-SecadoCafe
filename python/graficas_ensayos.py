@@ -2,20 +2,19 @@
 graficas_ensayos.py
 ====================
 
-Figuras y tabla resumen de los ensayos de fallo F1-F5 (guía de cierre, R4) a
+Figuras y tabla resumen de los ensayos de falla F1-F5 a
 partir de los CSV que guarda ``modbus_server.py --log-csv`` durante los
-ensayos con CODESYS y FluidSIM reales (21 oct 2026).
+ensayos con CODESYS y FluidSIM reales.
 
     F1  CODESYS detenido (Debug > Stop) y recuperación   -> F1_codesys.csv
     F2  FluidSIM detenido y recuperación                  -> F2_fluidsim.csv
     F3  STOP desde la HMI                                 -> F3_Stop.csv
     F5  Python detenido (el CSV termina; evidencia en la HMI: F5_hmi_python_caido.png)
-                                                          -> F4_python.csv (nombre del archivo
-                                                             tal como se guardó; es el ensayo F5)
+                                                          -> F5_python.csv
     F4 (recuperación) queda dentro de F1 y F2.
 
-F1_codesys.csv contiene al inicio una corrida de prueba anterior (16:13-16:21,
-modo sin FluidSIM); el ensayo empieza a las 16:49:55 y solo se usa esa parte.
+F1_codesys.csv contiene al inicio una corrida de prueba (16:13-16:21, modo
+sin FluidSIM); el ensayo empieza a las 16:49:55 y solo se usa esa parte.
 
 Uso:  python graficas_ensayos.py
 Salidas: ../figures/ensayos_fallos_F1_F2_F3.png y resultados/ensayos/resumen_ensayos.md
@@ -35,7 +34,7 @@ ENSAYOS = [
     ("F1", "CODESYS detenido (Debug > Stop) y recuperación", "F1_codesys.csv", "2026-10-21T16:49:55"),
     ("F2", "FluidSIM detenido y recuperación", "F2_fluidsim.csv", None),
     ("F3", "STOP desde la HMI", "F3_Stop.csv", None),
-    ("F5", "Python detenido", "F4_python.csv", None),
+    ("F5", "Python detenido", "F5_python.csv", None),
 ]
 
 
@@ -111,9 +110,9 @@ def main() -> None:
     datos = {cod: cargar(arch, desde) for cod, _, arch, desde in ENSAYOS}
 
     # ---------- tabla resumen ----------
-    lineas = ["# Ensayos de fallo F1–F5 (21 oct 2026)", "",
+    lineas = ["# Ensayos de falla F1–F5", "",
               "Generado por `python/graficas_ensayos.py` a partir de los CSV de "
-              "`modbus_server.py --log-csv`, con Python + CODESYS v8 + FluidSIM reales "
+              "`modbus_server.py --log-csv`, con Python + CODESYS + FluidSIM reales "
               "(factor 540, inicio 08:00, perfil REF, caudal 100 %). F4 (recuperación) está "
               "dentro de F1 y F2.", ""]
     for cod, nombre, arch, _ in ENSAYOS:
@@ -132,11 +131,11 @@ def main() -> None:
         if cod == "F3":
             lineas += ["Nota: al inicio de F3 (≈4.7 h de modelo) la máquina ventiló sin calentar porque CODESYS "
                        "seguía en PARO del ensayo anterior y Python se reinició (su reloj volvió a 0 y la "
-                       "post-ventilación no terminaba). Corregido en `codesys/v8/SECUENCIA.st` el 21 oct 2026; "
+                       "post-ventilación no terminaba). La secuencia final de `codesys/SECUENCIA.st` lo evita; "
                        "no afecta los cuatro STOP evaluados.", ""]
         if cod == "F5":
             lineas += ["El CSV termina con la planta en SECADO normal: al cerrar Python no hay quién registre "
-                       "(la guía no exige que la planta siga calculando si Python termina). La respuesta de "
+                       "(si Python termina, la planta deja de calcular). La respuesta de "
                        "CODESYS está en `F5_hmi_python_caido.png`: «Comunicación Python: ERROR» y semáforo rojo "
                        "(FALLA 1) por heartbeat congelado.", ""]
     lineas += ["## Lectura", "",
@@ -191,7 +190,7 @@ def main() -> None:
                         Patch(color="#e4e4e4", label="HOLD: PARO / FALLA / esperando START")],
                loc="lower center", ncol=3, fontsize=8, frameon=False)
     axes[-1].set_xlabel("Tiempo de planta [h de modelo]")
-    fig.suptitle("Ensayos de fallo con Python + CODESYS v8 + FluidSIM: la física sigue y el lote se recupera",
+    fig.suptitle("Ensayos de falla con Python + CODESYS + FluidSIM: la física sigue y el lote se recupera",
                  fontsize=11)
     fig.tight_layout(rect=(0, 0.04, 1, 0.97))
     ruta = os.path.normpath(os.path.join(AQUI, "..", "figures", "ensayos_fallos_F1_F2_F3.png"))

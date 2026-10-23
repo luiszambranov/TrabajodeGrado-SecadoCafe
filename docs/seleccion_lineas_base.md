@@ -1,13 +1,11 @@
 # Selección de líneas base
 
-Semana 4 - Fundamentos + primer hilo ejecutable (actualizado 6 oct 2026)
-
 Este documento fija las dos líneas base contra las que se
 compara la estrategia supervisada (Python + CODESYS + FluidSIM). La campaña
-Monte Carlo (5 oct 2026) comparó las tres estrategias bajo el mismo clima y la
+Monte Carlo compara las tres estrategias bajo el mismo clima y la
 misma humedad inicial: sol abierto (PASIVA), solar activa (ACTIVA) y propuesta
 supervisada con sus perfiles térmicos (ver
-`python/metodologia_estadistica_monte_carlo.md`, secciones 7 y 8).
+`python/metodologia_estadistica_monte_carlo.md`).
 
 ## 1. Línea base mínima: secado tradicional al sol (lazo abierto)
 
@@ -27,7 +25,7 @@ solar con ventilador) como alternativa activa, sobre las otras tres opciones
 consideradas (convectivo con aire caliente, mecánico/híbrido, asistido por
 bomba de calor).
 
-### Justificación frente a los criterios de la guía operativa
+### Justificación frente a los criterios de diseño
 
 | Criterio | Por qué cumple |
 |---|---|
@@ -62,28 +60,27 @@ un rango razonable, no copiará un único número de la literatura.
 
 | | Línea base activa | Propuesta supervisada |
 |---|---|---|
-| Fuente de calor | Solar | Resistencia eléctrica (decisión del 29 sept 2026; ver `python/dinamica_termica.py`) |
+| Fuente de calor | Solar | Resistencia eléctrica (ver `python/dinamica_termica.py`) |
 | Movimiento de aire | Extractor todo/nada por horario (06:00–18:00) | Ventilador de caudal variable (30–100 %) e inversión del aire cada 6 h con compuerta neumática (FluidSIM) |
 | Control | Ninguno (horario fijo) | Termostato del ducto + supervisión en CODESYS: perfiles térmicos, parada por humedad, alarmas, watchdog y enclavamiento resistencia–ventilador |
 | Supervisión | No | HMI con tendencias, alarmas y estado |
 | Registro de datos | No necesariamente | Sí, integrado (Python) |
 
-### Modelo cinético común (actualización 29 sept 2026)
+### Modelo cinético común
 
 Las tres estrategias (sol/patio, solar activa y propuesta supervisada) usan
 el **mismo** modelo cinético de Roa–Cenicafé (`python/cinetica_roa.py`;
 fuentes en `data/reference/roa_cenicafe_isoterma_capa_delgada.md`); solo
 cambian las condiciones de aire que recibe el café. El incremento solar de
-cada línea base se calibró contra literatura (actualizado 4 oct 2026, con
-datos de Cenicafé): solar pasiva 4.4 °C, para reproducir los 10.6 días de
+cada línea base se calibró contra literatura (datos de Cenicafé): solar pasiva 4.4 °C, para reproducir los 10.6 días de
 secado solar de Cenicafé con 1 400–1 800 h/año de brillo solar
-(Peñuela-Martínez et al., 2025); solar activa 12.5 °C (reducción de 47.5 %
+(Guerrero-Aguirre et al., 2025); solar activa 12.5 °C (reducción de 47.5 %
 frente a la pasiva, dentro del 30–50 % de Duque-Dussán et al., 2026 y del
 40–50 % de Meja et al., 2025; incremento dentro de 10–25 °C). Fuentes y
 detalle en `data/reference/chinchina_clima_fuentes.md`. Ver los
 docstrings de `escenario_sol_abierto.py` y `linea_base_activa.py`.
 
-### Configuración física común (29 sept 2026)
+### Configuración física común
 
 | | Patio | Solar activa | Supervisada (eléctrica) |
 |---|---|---|---|
@@ -102,7 +99,7 @@ Los estudios que modelan este tipo de secador con dinámica de fluidos
 computacional (CFD) resuelven las ecuaciones de Navier-Stokes completas, un
 nivel de detalle que excede el alcance de este trabajo. Se usará un modelo
 concentrado: balance de energía de la cámara + cinética de capa delgada,
-consistente con la recomendación de complejidad de la guía operativa.
+consistente con la recomendación de mantener un modelo de complejidad acotada.
 
 ## 4. Fuentes
 

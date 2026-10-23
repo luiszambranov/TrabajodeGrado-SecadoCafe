@@ -1,8 +1,8 @@
 # Física con el ventilador apagado: tiro natural, enfriamiento y secado residual
 
-Versión: 21 oct 2026. Responde a la guía de cierre (R4: «La planta no se pausa
-con el PLC») y a la observación del asesor en la asesoría: «la física nunca
-para; Python hace las veces del sistema real».
+La planta simulada representa el sistema físico: mientras el servidor corre, la
+física avanza aunque el proceso esté detenido, CODESYS o FluidSIM se caigan o
+el lote haya terminado.
 
 Código: `python/dinamica_termica.py` (`masa_aire_tiro_natural_kg_s`,
 `paso_plenum`), `python/lecho_secado.py` (`LechoThompson.paso_reposo`),
@@ -11,15 +11,13 @@ Código: `python/dinamica_termica.py` (`masa_aire_tiro_natural_kg_s`,
 Ensayo: `python/ensayo_continuidad_fisica.py` → `python/resultados/ensayos/continuidad_fisica.csv`
 y `figures/ensayo_continuidad_fisica.png`.
 
-## Qué cambió
+## Comportamiento de la planta
 
-| Antes (hasta el 20 oct 2026) | Ahora |
-|---|---|
-| En HOLD (REPOSO, PARO, FIN DE SECADO) el servidor avanzaba el modelo con dt = 0: no avanzaban el tiempo, el clima, la temperatura ni la humedad. | El tiempo físico avanza siempre. HOLD y la pérdida de comunicación solo cambian los comandos. |
-| Con el ventilador apagado el lecho quedaba congelado (ni se secaba ni se enfriaba). | El lecho se enfría hacia el ambiente y se sigue secando un poco con el calor que conserva (tiro natural). |
-| «Nuevo lote» creaba un secador nuevo a temperatura ambiente y reiniciaba el reloj del clima a medianoche. | El café nuevo entra a temperatura ambiente, pero la cámara conserva su temperatura y el reloj del clima sigue (día/noche). |
-| La protección de 90 °C recortaba el número (min(T, 90)) sin quitar la potencia. | La protección abre la resistencia y el paso se integra sin potencia. |
-| En lazo local la resistencia podía calentar en ENFRIAMIENTO. | `heater_cmd` de CODESYS es el permiso de calentar; en ENFRIAMIENTO solo hay ventilador. |
+- El tiempo físico avanza siempre; HOLD y la pérdida de comunicación solo cambian los comandos.
+- Con el ventilador apagado, el lecho se enfría hacia el ambiente y se sigue secando un poco con el calor que conserva (tiro natural).
+- «Nuevo lote»: el café nuevo entra a temperatura ambiente, pero la cámara conserva su temperatura y el reloj del clima sigue (día/noche).
+- La protección de 90 °C abre la resistencia y el paso se integra sin potencia.
+- `heater_cmd` de CODESYS es el permiso de calentar: en ENFRIAMIENTO solo hay ventilador.
 
 ## Modelo en reposo (ventilador apagado)
 

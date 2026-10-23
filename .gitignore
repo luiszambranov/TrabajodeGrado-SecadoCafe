@@ -13,9 +13,12 @@ venv/
 # CODESYS: opciones de usuario y archivo de bloqueo del proyecto abierto
 *.opt
 *.~u
+# CODESYS: información de compilación (se regenera al compilar, ~13 MB)
+*.compileinfo
+*.precompilecache
 
-# Copias sueltas que deja Claude (las figuras vigentes están en figures/)
-Claude outputs/
+# Respaldo automático de FluidSIM
+*.bak
 
 # Archivos de sistema y de Office
 .DS_Store

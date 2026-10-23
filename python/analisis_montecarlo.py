@@ -19,7 +19,7 @@ N = max(N_potencia, N_precision, 30), redondeado hacia arriba a decenas.
   prueba pareada, alfa = 0.05 bilateral, potencia 0.80, Delta = 12 h,
   d_z = Delta / sigma_d. N de la t pareada (t no central) dividido por la
   eficiencia relativa de Wilcoxon 0.955 (Lehmann, 1975).
-- N_precision (criterio de convergencia de la Guía, sección 11): el
+- N_precision (criterio de convergencia): el
   intervalo de confianza del 95 % de la media de t_obj de CADA estrategia
   debe tener un semiancho <= Delta/2 = 6 h, es decir, cada media se estima
   con una precisión de la mitad de la diferencia mínima de interés.
@@ -73,7 +73,7 @@ METRICAS = [
 ]
 ORDEN = ["PASIVA", "ACTIVA", "REF"] + FACTORIALES
 
-# Filtro de calidad (definido con Luis el 5 oct 2026, antes de la campaña final)
+# Filtro de calidad (definido antes de la campaña)
 # - Grano > 50 °C: 0 h (daño irreversible; González et al., 2010).
 # - Capa más húmeda <= 12 % b.h. (límite superior del rango seguro 10-12 %; SECAFÉ, 2008).
 # - Capa más seca >= 9 % b.h. (filtro B: tolerancia de 1 punto bajo el 10 %).

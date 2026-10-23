@@ -4,9 +4,7 @@ dinamica_termica.py
 
 Secador mecánico con RESISTENCIA ELÉCTRICA de la propuesta supervisada:
 dimensionamiento, balance de energía del aire de secado (plenum) y
-propiedades físicas del lecho de café. Versión v1 (29 sept 2026), que
-reemplaza al esqueleto v0 (ParametrosCamara con valores de orden de
-magnitud no calibrados).
+propiedades físicas del lecho de café.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
 Concepto físico (secador de capa estática, flujo de aire forzado)
@@ -117,7 +115,7 @@ def densidad_aparente_cafe(m_bs_pct: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Diseño del secador (lote de 80 kg c.p.s. - decisión de Luis, 29 sept 2026)
+# Diseño del secador (lote de 80 kg c.p.s.)
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -129,7 +127,7 @@ class ParametrosSecador:
     """
 
     masa_cps_kg: float = 80.0
-    """Café pergamino seco por lote [kg] (decisión de diseño, 29 sept 2026)."""
+    """Café pergamino seco por lote [kg] (decisión de diseño)."""
 
     caudal_especifico_m3_min_kg: float = 0.1
     """m3/min por kg c.p.s. (óptimo para lecho estático; González et al., 2010)."""
@@ -147,13 +145,12 @@ class ParametrosSecador:
     """Potencia específica del ventilador del secador de González et al.
     (2010): 4.95 kW para 2 000 kg c.p.s. = 2.475 W/kg -> 80 kg ~ 0.20 kW.
     Escalado lineal con la masa (mismo caudal específico y espesor).
-    Equipo comercial (4 oct 2026): Soler & Palau CBM/6-180/180-N-72W,
+    Equipo comercial: Soler & Palau CBM/6-180/180-N-72W,
     ~118 Pa a 480 m3/h según la curva del fabricante; 220 V x 1.0 A x FP 0.9
     = 0.20 kW de consumo máximo. Ver data/reference/equipos_energia.md."""
 
     caudal_min_frac: float = 0.30
-    """Caudal mínimo del ventilador como fracción del nominal (manipulada 2,
-    5 oct 2026). Por debajo de ~30 % un ventilador centrífugo con regulador
+    """Caudal mínimo del ventilador como fracción del nominal (manipulada 2). Por debajo de ~30 % un ventilador centrífugo con regulador
     de tensión pierde par y el calentador de ducto queda sin flujo seguro;
     se fija como límite de operación (criterio propio, declarado)."""
 
@@ -173,7 +170,7 @@ class ParametrosSecador:
     t_setpoint_c: float = 50.0
     """Temperatura máxima del aire/grano sin daño (González et al., 2010)."""
 
-    # --- Reposo (ventilador apagado), 21 oct 2026 -------------------------
+    # --- Reposo (ventilador apagado) --------------------------------------
     # La planta NO se congela al detener el proceso: con el ventilador
     # apagado el lecho sigue intercambiando calor y humedad. Ficha y
     # fuentes: data/reference/reposo_tiro_natural.md.
@@ -275,11 +272,9 @@ def paso_plenum(
     ``m_aire_natural_kg_s``: con el ventilador apagado, aire que entra por
     tiro natural (masa_aire_tiro_natural_kg_s); 0 = solo pérdidas UA.
 
-    Protección por sobretemperatura (21 oct 2026): si con la resistencia
+    Protección por sobretemperatura: si con la resistencia
     encendida el plenum superaría ``t_max_seguridad_c``, el corte térmico
-    abre y el paso se integra con la resistencia APAGADA. Antes se recortaba
-    el número (min(T, 90 °C)) sin quitar la potencia, lo que ocultaba el
-    efecto físico.
+    abre y el paso se integra con la resistencia APAGADA.
     """
     heater = 1 if (heater_cmd and fan_cmd) else 0          # enclavamiento de flujo
     m_aire = p.masa_aire_kg_s(t_ambiente_c, fan_frac) if fan_cmd else m_aire_natural_kg_s

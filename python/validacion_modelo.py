@@ -3,7 +3,7 @@ validacion_modelo.py
 =====================
 
 Validación del modelo del proyecto contra datos experimentales que NO se
-usaron para construirlo ni calibrarlo (5 oct 2026).
+usaron para construirlo ni calibrarlo.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
 Idea: lo común a las tres estrategias es la cinética del café (Roa-Cenicafé)
@@ -18,9 +18,8 @@ V1. Capa delgada a T y HR controladas (laboratorio): Phitakwinai, P., et al.
     temperature and relative humidity. Food Science & Nutrition, 7(9),
     2921-2931. Café arábica de Tailandia. Tiempo hasta MR = 0.2 reconstruido
     con su modelo Midilli modificado (Tabla 2), 9 condiciones.
-V2. Secado al sol en patio a condiciones medias: Eliseu (2008), café
-    robusta en Brasil, 26.3 °C / 63.3 % HR, 117.5 h. (Ya NO se usa para
-    calibrar desde el 4 oct 2026, así que es independiente.)
+V2. Secado al sol en patio a condiciones medias: Resende et al. (2009), café
+    robusta en Brasil, 26.3 °C / 63.3 % HR, 117.5 h (no se usa para calibrar).
 V3. Secador mecánico de lecho (independiente): Martínez-Tovar, D. G., &
     Álvarez-Hernández, J. R. (2006). Aprovechamiento de la energía calórica
     de estufas campesinas para el secado del café en fincas (Escafé).
@@ -29,7 +28,7 @@ V3. Secador mecánico de lecho (independiente): Martínez-Tovar, D. G., &
     ventilador de 1.15 m³/s nominales con 10 mm c.a. Resultado: ~3 días,
     10 % b.h. final, capas de 8.41 a 12.74 % b.h., 7 297 kJ/kg de agua.
 V4. Secado solar, validación cruzada dentro de una misma fuente:
-    Peñuela-Martínez et al. (2025). Se calibró con el grupo de 1 400-1 800
+    Guerrero-Aguirre et al. (2025). Se calibró con el grupo de 1 400-1 800
     h/año de sol (10.6 d); aquí se PREDICE el grupo de 1 061-1 399 h/año
     (15.5 d, rango 5.2-36.1 d) escalando el calentamiento solar efectivo
     con las horas de sol (1 230/1 600). Regla de escala: supuesto propio.
@@ -73,8 +72,8 @@ def v1_capa_delgada():
     return filas, rmse, float(np.mean(np.abs(err)) * 100)
 
 
-def v2_patio_eliseu():
-    """Roa a 26.3 °C / 63.3 % HR constantes; MR objetivo de Eliseu (1.355 -> 0.10 b.s.)."""
+def v2_patio_resende():
+    """Roa a 26.3 °C / 63.3 % HR constantes; MR objetivo de Resende et al. (1.355 -> 0.10 b.s.)."""
     t_c, rh = 26.3, 63.3
     me = roa.humedad_equilibrio_bs(t_c, rh)
     mr = (10.0 - me) / (135.5 - me) if 10.0 > me else 0.05
@@ -121,8 +120,8 @@ if __name__ == "__main__":
         print(f"   {T} C / {RH:2d} %: modelo {m:5.1f} h | ref {r:5.1f} h | {100 * (m - r) / r:+5.1f} %")
     print(f"   RMSE = {rmse:.2f} h | error medio absoluto = {mape:.1f} %\n")
 
-    t_m, t_r = v2_patio_eliseu()
-    print(f"V2 Patio (Eliseu 2008): modelo {t_m:.1f} h | ref {t_r} h | {100 * (t_m - t_r) / t_r:+.1f} %\n")
+    t_m, t_r = v2_patio_resende()
+    print(f"V2 Patio (Resende et al. 2009): modelo {t_m:.1f} h | ref {t_r} h | {100 * (t_m - t_r) / t_r:+.1f} %\n")
 
     print("V3 Secador Escafé (Martínez-Tovar & Álvarez 2006): ref ~3 d, capas 8.41-12.74 %, 7 297 kJ/kg agua")
     for m0 in (44.0, 48.0, 53.0):
@@ -132,5 +131,5 @@ if __name__ == "__main__":
     print(f"   (caudal a través del lecho: {r['caudal']:.3f} m³/min/kg)\n")
 
     dt, t_m, t_r = v4_solar_cruzada()
-    print(f"V4 Solar, grupo de 1 061-1 399 h/año de sol (Peñuela-Martínez 2025): DT efectivo {dt:.2f} C -> "
+    print(f"V4 Solar, grupo de 1 061-1 399 h/año de sol (Guerrero-Aguirre et al. 2025): DT efectivo {dt:.2f} C -> "
           f"modelo {t_m:.1f} d | ref {t_r} d (rango 5.2-36.1) | {100 * (t_m - t_r) / t_r:+.0f} %")

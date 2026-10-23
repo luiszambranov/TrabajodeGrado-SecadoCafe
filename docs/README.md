@@ -1,14 +1,10 @@
-# /docs
+# docs — Documentación técnica de apoyo
 
-Material de soporte para el documento del trabajo de grado.
-
-| Archivo | Contenido |
+| Archivo | Qué contiene |
 |---|---|
-| `tabla_variables.md` | Clasificación de variables (controladas, manipuladas, perturbaciones), mapa Modbus, parámetros con fuente y salidas de Monte Carlo. Base de la "tabla de variables operacionalizada" que pide el asesor. |
-| `evolucion_del_modelo.md` | Línea de tiempo del proyecto y por qué se descartó cada versión anterior (Newton, Logarítmico, Midilli → Roa–Cenicafé; lazo térmico local; caudal variable). |
-| `seleccion_lineas_base.md` | Por qué la línea base activa es secado solar con ventilación forzada, y diferencias con la propuesta supervisada. |
-| `matriz_comparativa_modelos.md` | Comparación inicial de modelos de capa delgada (semana 4). Histórico: la decisión final fue Roa–Cenicafé. |
-| `diagrama_simulacion.png` / `.pdf` / `.svg` | **Diagrama vigente** de la simulación (bloques, variables y flujo de datos), actualizado el 19 oct 2026 a PLC_PRG v7 + SECUENCIA, 27 registros y FluidSIM integrado. Es la Figura 1 del documento. Se regenera con `python diagrama_simulacion.py` (requiere `cairosvg`). |
-| `diagrama_arquitectura.svg` | Diagrama conceptual de la primera semana (Python → CODESYS → FluidSIM). Reemplazado por `diagrama_simulacion`. |
-
-El documento en Word está en `../apartado_doc/`.
+| `tabla_variables.md` | Tabla de variables del sistema: clasificación (controladas, manipuladas, perturbaciones, parámetros), mapa completo de registros Modbus 0–40 con unidad, sentido y variable de CODESYS, parámetros del modelo con su fuente y salidas de la campaña Monte Carlo. |
+| `seleccion_lineas_base.md` | Por qué las líneas base son el secado solar pasivo (patio) y el solar activo con ventilación forzada, y en qué se diferencian de la propuesta supervisada. |
+| `diagrama_arquitectura.png` / `.svg` | Diagrama simplificado de la arquitectura y el flujo de información (Python ⇄ CODESYS ⇄ FluidSIM). |
+| `diagrama_arquitectura.py` | Genera el diagrama anterior. Uso: `python diagrama_arquitectura.py` (requiere `pip install cairosvg`). |
+| `diagrama_simulacion.png` / `.svg` / `.pdf` | Diagrama completo de la simulación: bloques, variables que intercambian, registros Modbus y señales OPC. |
+| `diagrama_simulacion.py` | Genera el diagrama anterior. Uso: `python diagrama_simulacion.py` (requiere `cairosvg`). |

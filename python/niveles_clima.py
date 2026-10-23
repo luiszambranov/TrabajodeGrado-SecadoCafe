@@ -2,8 +2,8 @@
 niveles_clima.py
 =================
 
-Niveles de clima para las corridas dirigidas de la guía de cierre (R3, y el
-caso frío de R2), obtenidos de PERCENTILES de la serie diaria NASA POWER
+Niveles de clima para las corridas dirigidas (efecto_clima.py y el caso frío
+de limites_actuacion.py), obtenidos de PERCENTILES de la serie diaria NASA POWER
 2005-2024 (../data/clima/POWER_Naranjal_diario_2005_2024.csv), con el mismo
 «método delta» de ``variabilidad_clima.py``:
 
@@ -16,7 +16,7 @@ caso frío de R2), obtenidos de PERCENTILES de la serie diaria NASA POWER
    (T mín 16.4 °C, T máx 26.8 °C; Cenicafé 1998) y aplicados a todos los días
    de la corrida.
 
-Consistencia psicrométrica (guía de cierre, R3):
+Consistencia psicrométrica:
 - CT-/CT+ (temperatura): se conserva la trayectoria de HR nocturna del modelo
   (ea = 0.97·es(T mín), como ``generador_ambiente``); ea se recalcula con la
   nueva T mín. Si se dejara ea fija, CT- daría HR > 100 % de madrugada.
@@ -117,12 +117,12 @@ def niveles() -> list[Nivel]:
 
 
 def helada_hipotetica() -> Nivel:
-    """Caso de estrés que planteó el asesor (madrugada a -4 °C). NO pertenece al
+    """Caso de estrés hipotético (madrugada a -4 °C). NO pertenece al
     clima de Chinchiná (Naranjal, ~1 380 m: mínimas medias de 16 °C); sirve para
     mostrar qué consignas dejan de ser alcanzables con 6 kW."""
     t_min, t_max = -4.0, 8.0
     return Nivel("HELADA", "Hipotética: Tmín -4 °C, Tmáx 8 °C (fuera del clima del sitio)", t_min, t_max,
-                 FRAC_NOCHE * float(amb.es_kpa(t_min)), "Ejemplo del asesor; no es un percentil del sitio")
+                 FRAC_NOCHE * float(amb.es_kpa(t_min)), "Caso hipotético; no es un percentil del sitio")
 
 
 if __name__ == "__main__":

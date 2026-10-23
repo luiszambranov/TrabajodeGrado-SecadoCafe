@@ -6,7 +6,7 @@ Gráfica del lote completo a partir del CSV que escribe ``modbus_server.py --log
 
 Por qué existe: la tendencia de la HMI de CODESYS V3.5 SP9 (Trend Recording) muestra
 una ventana que se desplaza y en este proyecto no se logró que conservara el lote
-completo desde t = 0 (requisito R5 de la guía de cierre). El CSV del servidor sí
+completo desde t = 0. El CSV del servidor sí
 registra cada ciclo (1 s real = 0,15 h de modelo con factor 540), con lo que el PLC
 envió y lo que la planta aplicó, así que la historia completa del lote se reconstruye
 aquí. ``modbus_server.py`` la genera solo, sin opciones:

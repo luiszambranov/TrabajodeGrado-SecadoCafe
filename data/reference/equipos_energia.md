@@ -1,4 +1,4 @@
-# Equipos comerciales y balance de energía de las tres estrategias (4 oct 2026)
+# Equipos comerciales y balance de energía de las tres estrategias
 
 Implementado en `python/balance_energia.py`. Todas las estrategias secan el
 mismo lote de 80 kg c.p.s. de 55 a 11 % b.h. (78.2 kg de agua).
@@ -89,11 +89,10 @@ poder calorífico de ~26 MJ/kg (carbón bituminoso, supuesto propio), eso da
   (Caldas) se fija en el objetivo 4.
 
 
-## 6. Caudal variable: manipulada 2 (5 oct 2026)
+## 6. Caudal variable: manipulada 2
 
-La Guía vigente del asesor (sección 9.1, "Planta mínima controlable") pide
-dos variables manipuladas: (1) potencia/estado del calentamiento y
-(2) velocidad o caudal del ventilador. Desde el 5 oct 2026 el modelo tiene las dos.
+El modelo tiene dos variables manipuladas: (1) potencia/estado del
+calentamiento y (2) velocidad o caudal del ventilador.
 
 - **Fuente del criterio:** González, Sanz & Oliveros (2010), *Cenicafé*
   61(4): controlan el caudal con un PI y un variador de frecuencia para

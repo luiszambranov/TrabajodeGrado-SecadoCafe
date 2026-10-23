@@ -1,7 +1,6 @@
 # Modelo Roa–Cenicafé: isoterma de equilibrio + ecuación de capa delgada (café pergamino)
 
-Candidato a **modelo cinético único** del proyecto (decisión del 29 sept 2026,
-paso 2 del informe de prioridades del asesor, 25 sept 2026). Cubre todo el
+**Modelo cinético único** del proyecto. Cubre todo el
 dominio T–HR que recorren las tres estrategias, a diferencia de Phitakwinai
 et al. (2019), válido solo en 50–70 °C / 10–30 % HR.
 
@@ -69,7 +68,7 @@ L = (2502.4 - 2.4295·T)·[1 + 1.44408·exp(-21.6011·M)]     (kJ/kg; T °C; M d
 
 SECAFÉ (2008, ec. 14) transcribe 2.42958 y 21.5011; se usa el original.
 
-## 4. Verificación cruzada propia (29 sept 2026)
+## 4. Verificación cruzada propia
 
 **Contra Phitakwinai et al. (2019), Tabla 2 (Modified Midilli), tiempo hasta MR = 0.2:**
 
@@ -89,15 +88,15 @@ Diferencia < 10 % a 50–60 °C; a 70 °C Roa es hasta ~18 % más rápido. Me
 (4.1–7.9 % b.s.) queda dentro del rango final reportado por Phitakwinai
 (4.5–12.5 % b.s.). M0 de ambos estudios coincide (~55 % b.h. ≈ 122 % b.s.).
 
-**Contra secado en patio (Eliseu, ver `eliseu_2008_secado_patio.md`):**
+**Contra secado en patio (Resende et al., 2009; ver `resende_2009_secado_patio.md`):**
 a 26.3 °C / 63.3 % HR constantes, Roa predice MR = 0.05 en ~126 h, frente a
 117.5 h reportadas (C. canephora, patio real). Mismo orden y diferencia ~7 %.
 
 ## Limitaciones a declarar
 
-- Isoterma medida hasta 55 °C: su uso a 60–65 °C (régimen de la propuesta
-  supervisada) es extrapolación leve (5–10 °C), respaldada por la concordancia
-  con Phitakwinai en 50–70 °C.
+- Isoterma medida hasta 55 °C: cubre el régimen de la propuesta supervisada
+  (aire a 50 °C como máximo); la ecuación de capa delgada concuerda con
+  Phitakwinai et al. (2019) en 50–70 °C.
 - Isoterma de **desorción**: si M < Me (noche húmeda, patio) el modelo produce
   rehumectación con la misma curva; la histéresis de adsorción no está modelada.
 - Validación de SECAFÉ en secadores mecánicos (aire caliente); en baja T la

@@ -4,10 +4,9 @@ generador_ambiente.py
 
 Generador de temperatura y humedad relativa ambiente (nominal y
 perturbado), para alimentar los modelos de secado solar (línea base
-pasiva y línea base activa) y el aire de entrada del secador eléctrico.
-Versión vigente: 4 oct 2026 (ciclo asimétrico + variabilidad día a día
-AR(1) ajustada con NASA POWER 2005-2024, ver variabilidad_clima.py y
-data/reference/chinchina_clima_fuentes.md). Primera versión: semana 5.
+pasiva y línea base activa) y el aire de entrada del secador eléctrico:
+ciclo diurno asimétrico y variabilidad día a día AR(1) ajustada con NASA
+POWER 2005-2024 (variabilidad_clima.py, data/reference/chinchina_clima_fuentes.md).
 
 Zona climática de referencia
 -----------------------------
@@ -15,8 +14,9 @@ Estación Naranjal, Cenicafé (Centro Nacional de Investigaciones de
 Café), Chinchiná, Caldas — zona cafetera central de Colombia,
 ~1300-1400 msnm. Fuente:
 
-> "El clima de la estación central Naranjal". Revista Cenicafé,
-> 49(4), 290-307 (1998). https://www.cenicafe.org/es/publications/arc049(04)290-307.pdf
+> Baldión-Rincón, J. V., & Guzmán-Martínez, O. (1998). El clima de la
+> estación central Naranjal en Chinchiná, Caldas, Colombia. Cenicafé,
+> 49(4), 290-307. https://www.cenicafe.org/es/publications/arc049(04)290-307.pdf
 
 Datos reportados (usados como constantes de este módulo):
     - Temperatura media anual: 20.8 °C (oscilación estacional ~1.1 °C,
@@ -30,15 +30,14 @@ Datos reportados (usados como constantes de este módulo):
 
 Simplificaciones explícitas
 ----------------------------
-1. Ciclo diurno de temperatura (ACTUALIZADO 4 oct 2026): curva
+1. Ciclo diurno de temperatura: curva
    ASIMÉTRICA de dos semicosenos con el mínimo a las 05:30 y el máximo a
    las 15:30, que son los centros de las franjas medidas en la sede de
    Cenicafé en Chinchiná: "La temperatura mínima ocurre entre las 05:00 y
    las 06:00 y la máxima entre las 15:00 y las 16:00" (Guzmán & Ramírez,
    2004, Cenicafé 55(2), p. 112). El calentamiento dura 10 h y el
    enfriamiento 14 h, igual que el patrón descrito por Parton & Logan
-   (1981): sube rápido de día y baja lento de noche. Antes (v0.1) era un
-   seno simétrico con el mínimo a las 02:00 y el máximo a las 14:00.
+   (1981): sube rápido de día y baja lento de noche.
 2. Humedad relativa: se deriva de un enfoque psicrométrico simple. Se
    asume presión de vapor real (ea) aproximadamente constante durante el
    día (aproximación estándar en meteorología agrícola de corto plazo:
@@ -53,12 +52,12 @@ Simplificaciones explícitas
    independiente que podría contradecir la curva de T. Se ajusta la ea
    nominal para que la HR quede cerca de saturación quer la temperatura
    está en su mínimo (de noche), replicando lo reportado por Cenicafé.
-3. Variabilidad día a día (ACTUALIZADO 4 oct 2026): calculada de 20 años
+3. Variabilidad día a día: calculada de 20 años
    de datos diarios de NASA POWER (2005-2024, punto 4.97 N, 75.65 O,
    reanálisis MERRA-2) con python/variabilidad_clima.py y el "método
    delta": las MEDIAS siguen siendo las de Naranjal y de la serie solo se
    toman las desviaciones de cada día respecto a la media de su mes.
-       sigma T_min = 0.97 °C, sigma T_max = 1.36 °C (antes 1.5 supuesto)
+       sigma T_min = 0.97 °C, sigma T_max = 1.36 °C
        correlación T_min-T_max = -0.07 (~0, se tratan independientes)
        persistencia (autocorrelación de un día al siguiente):
            T_min 0.49, T_max 0.39 -> modelo AR(1) en
@@ -66,7 +65,7 @@ Simplificaciones explícitas
        ea: se deriva de T_min (FRACCION_SATURACION_NOCTURNA); el ruido
            residual de ea/es(T_min) es 4 % con persistencia 0.22.
    Cita: NASA Langley Research Center POWER Project, https://power.larc.nasa.gov
-   (consultado el 4 oct 2026). Datos en data/clima/.
+   Datos en data/clima/.
    Limitación: un reanálisis suaviza los extremos (los récords de Naranjal
    quedan a ~5 sigma), así que sigma podría estar algo subestimada; se
    recomienda un análisis de sensibilidad con sigma = 1.5 °C.
@@ -179,8 +178,8 @@ def condiciones_perturbadas(
     Para campañas Monte Carlo usar ``secuencia_dias_perturbados``, que
     respeta la persistencia día a día medida (AR(1)).
 
-    sigma_t : si se da, usa la misma sigma para T_min y T_max (compatibilidad
-        con v0.1 y análisis de sensibilidad); por defecto SIGMA_TMIN_C y
+    sigma_t : si se da, usa la misma sigma para T_min y T_max (análisis de
+        sensibilidad); por defecto SIGMA_TMIN_C y
         SIGMA_TMAX_C (NASA POWER).
     sigma_ea_frac : ruido fraccional de ea alrededor de
         FRACCION_SATURACION_NOCTURNA*es(T_min).
@@ -254,7 +253,7 @@ def ambiente_en(t_h: float, clima_dias) -> tuple[float, float, float]:
 HORA_AMANECER = 6.0
 HORA_OCASO = 18.0
 """Horas de sol aproximadas para Chinchina (~5 N): ~12 h de luz todo el
-año por la cercanía al ecuador. Aproximación de este v0.1."""
+año por la cercanía al ecuador. Aproximación del modelo."""
 
 
 def incremento_solar(t_horas: np.ndarray, dt_max_c: float) -> np.ndarray:

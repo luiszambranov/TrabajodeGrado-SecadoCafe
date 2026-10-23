@@ -1,4 +1,4 @@
-# Sensibilidad tipo tornado ±20 % (21 oct 2026)
+# Sensibilidad tipo tornado ±20 %
 
 Generado por `python/sensibilidad_tornado.py`: 10 realizaciones de la campaña (semillas 1001–1010) × REF y P1-C75 × (base + 8 variantes) = 180 corridas pareadas. Un factor a la vez.
 

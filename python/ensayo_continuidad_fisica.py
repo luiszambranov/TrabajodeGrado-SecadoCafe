@@ -2,7 +2,7 @@
 ensayo_continuidad_fisica.py
 =============================
 
-Ensayo de continuidad física de la planta (guía de cierre, R4, 21 oct 2026):
+Ensayo de continuidad física de la planta:
 la física NO se pausa con STOP/HOLD, fin de secado ni pérdida de
 comunicación. Se maneja ModeloSecadoPlant directamente (sin Modbus ni
 CODESYS) con una secuencia de comandos que imita a PLC_PRG/SECUENCIA, con

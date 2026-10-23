@@ -29,8 +29,8 @@ Uso (desde la carpeta python/)
 ------------------------------
     # Piloto (10 realizaciones, semillas 1-10):
     python campana_montecarlo.py --n 10 --semilla-inicial 1 --salida resultados/piloto
-    # Campaña final (N calculado con analisis_montecarlo.py, semillas nuevas):
-    python campana_montecarlo.py --n 120 --semilla-inicial 1001 --salida resultados/campana --procesos 4
+    # Campaña final (N = 150, calculado con analisis_montecarlo.py; semillas nuevas):
+    python campana_montecarlo.py --n 150 --semilla-inicial 1001 --salida resultados/campana --procesos 4
 
 - Guarda cada realización apenas termina (resultados.csv): si se corta la
   luz o se cierra la terminal, al volver a correr el MISMO comando continúa

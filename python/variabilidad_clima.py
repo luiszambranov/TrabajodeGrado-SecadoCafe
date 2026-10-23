@@ -5,13 +5,13 @@ variabilidad_clima.py
 Calcula la VARIABILIDAD DÍA A DÍA del clima de Chinchiná a partir de una
 serie diaria real, para reemplazar los supuestos ``sigma_t = 1.5 °C`` y
 ``sigma_ea_frac = 0.08`` de ``generador_ambiente.condiciones_perturbadas``
-(pendiente del 4 oct 2026, punto 1 de la auditoría del modelo).
+por valores medidos.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
 Método ("método delta")
 ------------------------
 - Los VALORES MEDIOS siguen siendo los de la estación Naranjal de Cenicafé
-  (T_min 16.4 °C, T_max 26.8 °C; Cenicafé 49(4), 1998), que es medición
+  (T_min 16.4 °C, T_max 26.8 °C; Baldión-Rincón & Guzmán-Martínez, 1998), que es medición
   en el sitio.
 - De la serie diaria se toman solo las DESVIACIONES respecto a la media de
   cada mes (anomalías). Así el sesgo absoluto de un reanálisis en montaña
@@ -129,11 +129,11 @@ if __name__ == "__main__":
     print(f"Media T_min / T_max NASA POWER: {r['media_tmin_power_c']:.1f} / {r['media_tmax_power_c']:.1f} °C "
           f"(Naranjal: 16.4 / 26.8 °C; la diferencia es el sesgo de la celda y NO se usa)")
     print(f"sigma T_min = {r['sigma_tmin_c']:.2f} °C | sigma T_max = {r['sigma_tmax_c']:.2f} °C "
-          f"(supuesto actual 1.5 °C para ambas)")
-    print(f"Correlación T_min-T_max = {r['corr_tmin_tmax']:.2f} (supuesto actual: 0, independientes)")
+          f"(frente al supuesto genérico de 1.5 °C)")
+    print(f"Correlación T_min-T_max = {r['corr_tmin_tmax']:.2f} (frente al supuesto genérico de 0)")
     print(f"Autocorrelación de un día al siguiente: T_min {r['autocorr_tmin_1d']:.2f}, T_max {r['autocorr_tmax_1d']:.2f} "
-          f"(supuesto actual: 0, días independientes)")
+          f"(frente al supuesto genérico de días independientes)")
     if "sigma_ea_frac" in r:
-        print(f"sigma fraccional de ea = {r['sigma_ea_frac']:.3f} (supuesto actual 0.08); "
+        print(f"sigma fraccional de ea = {r['sigma_ea_frac']:.3f} (frente al supuesto genérico de 0.08); "
               f"autocorrelación {r['autocorr_ea_1d']:.2f}; correlación con T_min {r['corr_ea_tmin']:.2f}")
     print(chequeo_extremos(r["sigma_tmin_c"], r["sigma_tmax_c"]))

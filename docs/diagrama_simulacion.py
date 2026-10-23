@@ -107,7 +107,7 @@ caja(xs[3], by, bw, bh, 4, "LECHO DE CAFÉ: 8 CAPAS", "lecho_secado.py + cinetic
 caja(xs[4], by, bw, bh, 5, "ENERGÍA Y TIEMPO", "secador_electrico.py", [
     ("Calcula", ["E_resistencia = Σ P_res · Δt", "E_ventilador = Σ P_vent · Δt", "kWh por kg de café",
                  "kJ por kg de agua evaporada", "tiempo_proceso_h (horas de modelo)"]),
-    ("Escala de tiempo", ["1 ciclo = 1 s real", "factor 540 → 0.15 h de modelo", "Modelo congelado en HOLD",
+    ("Escala de tiempo", ["1 ciclo = 1 s real", "factor 540 → 0.15 h de modelo", "En HOLD la física sigue",
                           "Termostato: 1 s · Lecho: 1 min"]),
     ("Salidas", ["tiempo_proceso_h · energia_kWh", "heartbeat (+1 cada ciclo)", "safety_ok (watchdog Python)"]),
 ], C_PY)
@@ -127,11 +127,11 @@ t(W / 2, my + 30, "MODBUS TCP · 127.0.0.1 : 5020 · Python = esclavo · CODESYS
   C_MB[0], "middle")
 t(50, my + 62, "Flechas verdes: Python → CODESYS (lectura FC03, cada REAL = 2 registros):", 15, "bold", C_PY[0])
 t(50, my + 86, "0-1 T_process · 4-5 RH_ambient · 7 safety_ok · 8-9 M_coffee · 10-11 tiempo_proceso_h · 12 heartbeat", 14)
-t(50, my + 108, "13-14 RH_process · 16-17 M_coffee_max · 18-19 heater_duty · 22-23 caudal_m3_min · 24-25 energia_kWh", 14)
+t(50, my + 108, "13-14 RH_process · 16-17 M_coffee_max · 18-19 heater_duty · 22-23 caudal_m3_min · 24-25 energia_kWh · 27-39 relojes y estado", 14)
 t(1080, my + 62, "Flechas azules: CODESYS → Python (escritura FC06):", 15, "bold", C_CS[0])
 t(1080, my + 86, "2 heater_cmd · 3 fan_cmd · 6 plant_mode (0 RUN / 1 HOLD)", 14)
-t(1080, my + 108, "15 flow_dir_cmd · 20 fan_speed_pct · 21 reset_lote_cmd · 26 setpoint_cmd", 14)
-t(50, my + 136, "Watchdog Python: si CODESYS no escribe en 5 s → heater y fan forzados a 0, safety_ok = 0.   "
+t(1080, my + 108, "15 flow_dir_cmd · 20 fan_speed_pct · 21 reset_lote_cmd · 26 setpoint_cmd · 40 fluidsim_estado", 14)
+t(50, my + 136, "Watchdog Python: si CODESYS no escribe en 5 s → resistencia en 0, post-ventilación y safety_ok = 0.   "
                 "Watchdog CODESYS: si heartbeat no cambia en 4 s → comm_error.", 13, "normal", "#455a64")
 GV, AZ = "#2e7d32", "#1565c0"
 c = lambda i: xs[i] + bw / 2
@@ -151,7 +151,7 @@ for x in (760, 980):
 cy = 880
 out.append(f'<rect x="20" y="{cy}" width="{W - 40}" height="405" rx="14" fill="none" stroke="{C_CS[0]}" '
            'stroke-width="2" stroke-dasharray="8 6"/>')
-t(W - 40, cy + 26, "CODESYS CONTROL WIN V3 — SUPERVISIÓN (PLC_PRG v7 + SECUENCIA) Y HMI", 16, "bold", C_CS[0], "end")
+t(W - 40, cy + 26, "CODESYS CONTROL WIN V3 — SUPERVISIÓN (PLC_PRG + SECUENCIA) Y HMI", 16, "bold", C_CS[0], "end")
 cby, cbh = cy + 40, 350
 caja(40, cby, 470, cbh, 6, "COMUNICACIÓN Y SEGURIDAD", "PLC_PRG · canales Modbus_TCP_Slave", [
     ("Recibe y convierte", ["2 WORD → REAL (U_WORDS_TO_REAL)", "T_process, M_coffee, M_coffee_max,",
@@ -159,10 +159,10 @@ caja(40, cby, 470, cbh, 6, "COMUNICACIÓN Y SEGURIDAD", "PLC_PRG · canales Modb
     ("Vigila", ["heartbeat congelado 4 s → comm_error", "safety_alarm = (safety_ok = 0) OR comm_error",
                 "Con comm_error todo pasa a valor seguro"]),
 ], C_CS)
-caja(530, cby, 640, cbh, 7, "LÓGICA DE SUPERVISIÓN", "PLC_PRG v7 + SECUENCIA (máquina de estados)", [
+caja(530, cby, 640, cbh, 7, "LÓGICA DE SUPERVISIÓN", "PLC_PRG + SECUENCIA (máquina de estados)", [
     ("Secuencia (SECUENCIA, CASE OF)", ["REPOSO → CARGA → SECADO ⇄ INVERSIÓN → ENFRIAMIENTO",
                                        "  → FIN DE SECADO → DESCARGA; PARO, FALLA, EMERGENCIA",
-                                       "planta_run → plant_mode (HOLD congela el modelo)"]),
+                                       "planta_run → plant_mode (RUN / HOLD)"]),
     ("Comandos que envía a Python (PLC_PRG)", ["fan_cmd / heater_cmd = permiso según estado y comm_error",
                                     "setpoint_cmd = perfil (REF, P1, P2, P3; cambio al 30 % b.h.)",
                                     "fan_speed_pct = caudal del lote (30, 75 o 100 %)",
@@ -184,7 +184,7 @@ flecha(1171, cby + 175, 1187, cby + 175)
 flecha(1591, cby + 175, 1607, cby + 175)
 
 # ---------------- Pie: clasificación de variables ----------------
-t(40, H - 14, "Clasificación (Guía 9.1):  Controlada: T_process  ·  Salida: M_coffee / M_coffee_max  ·  Manipulada 1: resistencia (heater)  ·  "
+t(40, H - 14, "Clasificación de variables:  Controlada: T_process  ·  Salida: M_coffee / M_coffee_max  ·  Manipulada 1: resistencia (heater)  ·  "
               "Manipulada 2: caudal (fan_speed_pct)  ·  Perturbación: clima de Chinchiná  ·  Restricciones: 50 °C máx., enclavamiento, watchdog",
   14, "bold", "#37474f")
 

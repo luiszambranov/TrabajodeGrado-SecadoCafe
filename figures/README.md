@@ -1,21 +1,22 @@
-# /figures
+# figures — Figuras del documento
 
-Figuras para el documento final. Se regeneran con `python/graficas_perfiles.py`.
+Todas se regeneran con los scripts de `python/` (entre paréntesis), salvo las
+capturas de pantalla.
 
-| Archivo | Contenido |
+| Archivo | Qué muestra |
 |---|---|
-| `perfiles_resumen.png` | Setpoint de los 4 perfiles (REF, P1, P2, P3) en función de la humedad del café. |
-| `perfil_REF.png` | Referencia de Cenicafé: T_process, setpoint, T ambiente, humedad del lote y de las capas, franjas de aire invertido. |
-| `ensayo_continuidad_fisica.png` | Ensayo de continuidad física (21 oct 2026, `python/ensayo_continuidad_fisica.py`): paro, enfriamiento, comunicación perdida y recuperación con la cámara caliente; la planta sigue evolucionando. |
-| `perfil_P1.png`, `perfil_P2.png`, `perfil_P3.png` | Cada perfil con los 3 caudales: temperatura, humedad y el instante de cambio de setpoint (P2 y P3, al 30 % b.h.). |
+| `perfiles_resumen.png` | Consigna de los cuatro perfiles (REF, P1, P2, P3) en función de la humedad del lote (`graficas_perfiles.py`). |
+| `perfil_REF.png` | Perfil de referencia de Cenicafé en el día nominal: temperatura del aire, consigna, ambiente, humedad del lote y de las capas, y franjas con el aire invertido (`graficas_perfiles.py`). |
+| `perfil_P1.png`, `perfil_P2.png`, `perfil_P3.png` | Cada perfil con los tres caudales: temperatura, humedad y el instante del cambio de consigna en P2 y P3 (`graficas_perfiles.py`). |
+| `diferencias_pareadas.png` | Diferencias de tiempo y energía de P1-C75 y P3-C75 frente a REF, realización por realización (`analisis_pareado.py`). |
+| `limites_actuacion.png` | Lo pedido frente a lo físicamente aplicado: consigna, temperatura lograda, ciclo de trabajo y saturación de la resistencia (`limites_actuacion.py`). |
+| `efecto_clima.png` | Efecto separado de la temperatura y la humedad ambiente (niveles p5/p95 de NASA POWER): humedad del lote, esfuerzo de la resistencia y cambio de tiempo y energía frente al clima nominal (`efecto_clima.py`). |
+| `sensibilidad_tornado.png` | Efecto de variar ±20 % cada parámetro del modelo (`sensibilidad_tornado.py`). |
+| `ensayos_fallos_F1_F2_F3.png` | Ensayos de falla con CODESYS y FluidSIM: CODESYS detenido, FluidSIM detenido y STOP desde la HMI (`graficas_ensayos.py`). |
+| `ensayo_continuidad_fisica.png` | La planta sigue evolucionando durante un paro, una pérdida de comunicación y la recuperación (`ensayo_continuidad_fisica.py`). |
+| `lote_codesys_P3C100.png` | Lote completo P3-C100 supervisado por CODESYS y FluidSIM: temperatura, humedad por capas, potencia y caudal (`grafica_lote.py`, generada por el servidor). |
+| `hmi_secado.png` | Captura de la HMI de CODESYS al terminar un lote. |
 
-Caso determinista: día nominal de Chinchiná y M0 = 55 % b.h. Las figuras de
-la campaña Monte Carlo (convergencia, cajas, Pareto) están en
-`python/resultados/campana/`. El diagrama de la simulación está en `docs/`.
-
-## Capturas de la HMI de CODESYS (22 oct 2026)
-
-| Archivo | Contenido |
-|---|---|
-| `hmi_secado_terminado_REF.png` | HMI v8 al terminar un lote REF (50 °C, 100 %): pilotos «Secado terminado», «Bandeja adentro», «Aire invertido», comunicación con Python OK, energía 143,3 kWh, selector de perfil y caudal. Las tendencias de la HMI muestran solo una ventana móvil (limitación de R5); el lote completo está en `lote_codesys_*.png`. |
-| `lote_codesys_P1C75.png`, `lote_codesys_REF.png` | Lote completo supervisado por CODESYS + FluidSIM (corridas de verificación, semilla 1001), generado por `python/grafica_lote.py` desde el CSV del servidor: temperatura, consigna y ambiente; humedad promedio y por capas con inversiones de flujo y fin de secado; potencia y caudal. |
+Las figuras de la campaña Monte Carlo (convergencia, cajas y Pareto) están en
+`python/resultados/campana/`; el circuito de FluidSIM en `fluidsim/` y los diagramas
+de la arquitectura en `docs/`.

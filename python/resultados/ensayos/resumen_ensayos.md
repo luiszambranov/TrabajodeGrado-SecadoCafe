@@ -1,6 +1,6 @@
-# Ensayos de fallo F1–F5 (21 oct 2026)
+# Ensayos de falla F1–F5
 
-Generado por `python/graficas_ensayos.py` a partir de los CSV de `modbus_server.py --log-csv`, con Python + CODESYS v8 + FluidSIM reales (factor 540, inicio 08:00, perfil REF, caudal 100 %). F4 (recuperación) está dentro de F1 y F2.
+Generado por `python/graficas_ensayos.py` a partir de los CSV de `modbus_server.py --log-csv`, con Python + CODESYS + FluidSIM reales (factor 540, inicio 08:00, perfil REF, caudal 100 %). F4 (recuperación) está dentro de F1 y F2.
 
 ## F1. CODESYS detenido (Debug > Stop) y recuperación
 
@@ -30,13 +30,13 @@ Archivo `F3_Stop.csv` (206 filas, 16:58:18–17:01:46).
 | 17:00:35 | 8.1 | 20.25 → 21.45 | 49.9 → 16.5 | 16.4 | 0 | 35.19 → 34.83 | 56.14 → 56.20 | 13.65 → 13.65 | 1.65 → 2.55 | 17:00:43 (E 57.01 kWh, M 34.74 %) |
 | 17:01:17 | 25.3 | 26.55 → 30.30 | 49.9 → 25.1 | 26.4 | 0 | 26.92 → 26.68 | 80.16 → 80.19 | 18.75 → 18.75 | 2.55 → 6.15 | 17:01:42 (E 80.77 kWh, M 26.56 %) |
 
-Nota: al inicio de F3 (≈4.7 h de modelo) la máquina ventiló sin calentar porque CODESYS seguía en PARO del ensayo anterior y Python se reinició (su reloj volvió a 0 y la post-ventilación no terminaba). Corregido en `codesys/v8/SECUENCIA.st` el 21 oct 2026; no afecta los cuatro STOP evaluados.
+Nota: al inicio de F3 (≈4.7 h de modelo) la máquina ventiló sin calentar porque CODESYS seguía en PARO del ensayo anterior y Python se reinició (su reloj volvió a 0 y la post-ventilación no terminaba). La secuencia final de `codesys/SECUENCIA.st` lo evita; no afecta los cuatro STOP evaluados.
 
 ## F5. Python detenido
 
-Archivo `F4_python.csv` (50 filas, 17:02:27–17:03:17).
+Archivo `F5_python.csv` (50 filas, 17:02:27–17:03:17).
 
-El CSV termina con la planta en SECADO normal: al cerrar Python no hay quién registre (la guía no exige que la planta siga calculando si Python termina). La respuesta de CODESYS está en `F5_hmi_python_caido.png`: «Comunicación Python: ERROR» y semáforo rojo (FALLA 1) por heartbeat congelado.
+El CSV termina con la planta en SECADO normal: al cerrar Python no hay quién registre (si Python termina, la planta deja de calcular). La respuesta de CODESYS está en `F5_hmi_python_caido.png`: «Comunicación Python: ERROR» y semáforo rojo (FALLA 1) por heartbeat congelado.
 
 ## Lectura
 

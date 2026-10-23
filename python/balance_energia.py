@@ -4,7 +4,7 @@ balance_energia.py
 
 Balance de energía COMÚN a las tres estrategias de secado (solar pasiva,
 solar activa y propuesta supervisada con resistencia eléctrica), para
-compararlas con la misma métrica (pedido del asesor, 4 oct 2026).
+compararlas con la misma métrica.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
 Métricas
@@ -46,7 +46,7 @@ Radiación global media en la sede de Cenicafé (Chinchiná): 4 582 Wh/m2/día
 (Cenicafé 54(2), 110-133). Se reparte en medio seno de 06:00 a 18:00 (el
 mismo perfil de generador_ambiente.incremento_solar):
     G(h) = G_max * sin(pi*(h-6)/12),  G_max = 4.582*pi/24 = 0.600 kW/m2
-Área de secado solar: 11.1 m2 (7.2 kg c.p.s./m2; Peñuela-Martínez et
+Área de secado solar: 11.1 m2 (7.2 kg c.p.s./m2; Guerrero-Aguirre et
 al., 2025).
 Limitación: se usa la radiación MEDIA en todos los días (no hay serie de
 radiación por realización Monte Carlo).
@@ -61,7 +61,7 @@ import cinetica_roa as roa
 
 RADIACION_DIARIA_KWH_M2 = 4.582      # Cenicafé 54(2), media anual, sede Chinchiná
 HORA_SALIDA_SOL, HORA_PUESTA_SOL = 6.0, 18.0
-AREA_SOLAR_M2 = 80.0 / 7.2           # Peñuela-Martínez et al. (2025)
+AREA_SOLAR_M2 = 80.0 / 7.2           # Guerrero-Aguirre et al. (2025)
 POTENCIA_EXTRACTOR_ACTIVA_KW = 0.040  # S&P HCM-225N
 MASA_CPS_KG = 80.0
 CALOR_LATENTE_REF_KJ_KG = 2430.0      # agua libre a ~30 °C (tablas de vapor); el

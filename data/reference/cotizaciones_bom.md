@@ -5,7 +5,7 @@ sale del dimensionamiento (`secador_electrico_dimensionamiento.md`, `equipos_ene
 producto cotizado, el enlace donde se encontró y la verificación de que sirve para este secador.
 
 - **Importados:** precio sin IVA × tasa × 1,37 (IVA 19 % × 1,15 por envío y arancel; supuesto propio).
-  Tasas: dólar 3 170,46 COP (16 oct 2026; Portafolio, 2026b) y euro 3 569,90 COP (15 oct 2026; Portafolio, 2026a).
+  Tasas: dólar 3 170,46 COP y euro 3 569,90 COP.
 - **Escenario A:** adaptar un secador mecánico existente (control, instrumentación, seguridad,
   actuación y kit de inversión del aire). **Escenario B:** A + cámara de secado propia de 1,28 m² y 20 cm de lecho,
   igual a la simulada (reemplaza a la Penagos SC-10 de la versión anterior, que es a gas y de 3 pisos).
@@ -113,24 +113,12 @@ producto cotizado, el enlace donde se encontró y la verificación de que sirve 
 | Fabricación de la cámara | 40 h × 30 000 COP/h; supuesto | 1 200 000 |
 | **CAPEX B** | | **22 801 451** |
 
-## Cambios frente a la cotización del 19 oct (resultado de la verificación)
+## Alternativas y notas
 
-| Ítem | Antes | Ahora | Motivo |
-|---|---|---|---|
-| Ventilador | S&P CBM 7/7 72 W, 955 411 COP | S&P CBT-80N trifásico, 2 331 231 COP | El CBM 7/7 es monofásico de 230 V y no funciona con el variador de salida trifásica |
-| Medidor de humedad | Genérico de 25 granos, 817 000 COP | Agratronix 08150, 2 823 295 COP | El genérico no indica rango, precisión ni curva para café pergamino |
-| Paro de emergencia | DynamoElectronics, 2 NA, 17 000 COP | Autonics S2ER-E3RB, 1 NC, 24 000 COP | La lógica del PLC y FluidSIM usa contacto NC (Anexo D) |
-| Disipadores de SSR | No estaban | 3 × 9 800 COP | Un SSR de 40 A con 9 A de carga necesita disipador |
-| Transmisor de HR ambiente | Por cotizar | Comet P3110E, 748 287 COP | Pendiente del 19 oct |
-| Estructura | Penagos SC-10 en B (5 870 000 COP) | Kit de inversión en A y cámara propia en B | La Penagos es a gas y de 3 pisos; la cámara propia es la simulada |
-
-## Pendientes y alternativas
-
-- **Controlador:** el S7-1200 es la referencia de cálculo; con WAGO PFC100 (CODESYS) la CPU sola cuesta ~2,86 M COP.
-  Decisión pendiente con el asesor.
+- **Controlador:** el S7-1200 es la referencia de cálculo; con un WAGO PFC100 (programable en CODESYS) la CPU sola cuesta ~2,86 M COP.
 - **Confirmar con el proveedor:** pistón magnético del cilindro SAI, driver de la HMI Kinco para el PLC elegido,
   punto de operación del CBT-80N a 480 m³/h y temperatura máxima de la lana de vidrio.
-- **Agotados el 20 oct:** gabinete y breakers de Homecenter; se mantienen como precio de referencia.
+- **Gabinete y breakers:** agotados en Homecenter el día de la consulta; se mantienen como precio de referencia.
 - **Compuerta eléctrica:** actuador Belimo LF24 (273,52 USD ≈ 1 188 042 COP) en lugar de la compuerta neumática con
   compresor (≈ 1,55 M COP). https://www.kele.com/product/actuators-and-dampers/spring-return/belimo/lf24
 - **Energía del ventilador:** el modelo usa 0,20 kW nominales; el CBT-80N tiene 0,37 kW, pero con el variador a ~66 %
@@ -144,8 +132,8 @@ subsistencia); 1 144,3472 COP/kWh (comercial e industrial, con contribución).
 ## Fuentes generales
 
 - Central Hidroeléctrica de Caldas (2026). Tarifas septiembre 2026. https://www.chec.com.co/content/dam/chec/documentos/main/transparencia/planeacion-presupuestos-e-informes/publicaciones-de-tarifas/2026/20260901_Tarifas_septiembre_2026.pdf
-- Portafolio (2026a, 15 de octubre). Euro en Colombia hoy. https://www.portafolio.co/economia/finanzas/euro-en-colombia-hoy-15-de-octubre-cotizacion-sube-y-se-ubica-en-3-569-504526
-- Portafolio (2026b, 16 de octubre). Precio del dólar hoy en Colombia. https://www.portafolio.co/economia/finanzas/precio-del-dolar-hoy-en-colombia-asi-cotiza-la-divisa-este-16-de-octubre-tras-perder-casi-504569
+- Portafolio (2026a). Euro en Colombia hoy. https://www.portafolio.co/economia/finanzas/euro-en-colombia-hoy-15-de-octubre-cotizacion-sube-y-se-ubica-en-3-569-504526
+- Portafolio (2026b). Precio del dólar hoy en Colombia. https://www.portafolio.co/economia/finanzas/precio-del-dolar-hoy-en-colombia-asi-cotiza-la-divisa-este-16-de-octubre-tras-perder-casi-504569
 - Soler & Palau. Serie CBT-N/CBB-N (ficha técnica). https://statics.solerpalau.com/media/import/documentation/EN_CBT-N.pdf
 - Siemens. SM 1231 AI 4, 6ES7231-4HD32-0XB0 (hoja de datos). https://www.elemon.com.ar/images/productos/hojas-de-datos/siemens/6es7231-4hd32-0xb0.pdf
 - Los enlaces de cada producto están en las tablas.

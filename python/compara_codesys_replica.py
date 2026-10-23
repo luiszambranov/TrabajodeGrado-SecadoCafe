@@ -3,9 +3,9 @@ compara_codesys_replica.py
 ===========================
 
 Verificación de equivalencia Python+CODESYS+FluidSIM frente a la réplica en
-Python de la campaña (guía de cierre, pág. 10; observación §3.1 del evaluador).
+Python de la campaña Monte Carlo.
 
-Procedimiento (en el PC con CODESYS v8 y FluidSIM):
+Procedimiento (en el PC con CODESYS y FluidSIM):
     python modbus_server.py --semilla 1001 --log-csv resultados/verificacion/V1001_REF.csv
     En la HMI: perfil REF, caudal 100 %, «Nuevo lote» y START; dejar llegar a FIN DE SECADO.
     Repetir con otras semillas/perfiles (p. ej. 1002 REF, 1001 P1-C75).

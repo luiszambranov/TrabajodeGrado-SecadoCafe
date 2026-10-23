@@ -1,14 +1,18 @@
 // =====================================================================
 // SECUENCIA — Máquina de estados del secador de café (CASE OF)
 // Proyecto: Supervisión IoT del secado de café (CODESYS V3.5 SP9)
-// Versión: 14 oct 2026 (botón Nuevo lote + auxiliares HMI)
+//   Estados de operación, pulsadores de campo y HMI, cilindros de FluidSIM, ventilador,
+//   semáforo, post-ventilación en PARO y FALLA, EMERGENCIA con todas las salidas en cero,
+//   inversión del aire con el tiempo de secado efectivo (registro 29) y vigilancia del
+//   enlace con FluidSIM (falla 5). La física de la planta no depende de este programa:
+//   Python sigue integrando aunque CODESYS o FluidSIM se detengan.
 //
 // Llamar en la MainTask DESPUÉS de PLC_PRG:
 //   MainTask: 1) PLC_PRG   (lee Python por Modbus, watchdog, fin_secado)
 //             2) SECUENCIA (decide estado, cilindros, ventilador, semáforo)
 //
 // Dueño de variables: SECUENCIA escribe solo en GVL_SECUENCIA.
-// De PLC_PRG solo LEE: comm_error, safety_ok, fin_secado, tiempo_secado_h.
+// De PLC_PRG solo LEE: comm_error, safety_ok, fin_secado, tiempo_secado_h, t_secado_efectivo_h, t_planta_h.
 //
 // Fuentes:
 // - Inversión del aire cada 6 h: Parra-Coronado et al. (2008), SECAFÉ, Cenicafé.
@@ -27,6 +31,15 @@ VAR
     // --- Diagnóstico ---
     falla_comm       : BOOL;
     falla_fc         : BOOL;   // los dos finales de carrera de un cilindro activos a la vez
+    falla_fluidsim   : BOOL;   // el pulso de vida de FluidSIM dejó de cambiar
+    tmr_fs           : TON;    // vigila el pulso de vida de FluidSIM
+    pulso_fs_anterior: BOOL;
+
+    // --- post-ventilación (resistencia en 0, ventilador sigue un tiempo) ---
+    calentaba        : BOOL;   // la resistencia tenía permiso justo antes de la parada
+    pv_activa        : BOOL;   // hay post-ventilación pendiente en PARO / FALLA
+    t_pv_ini_h       : REAL;   // tiempo de planta al empezar la post-ventilación
+    post_vent        : BOOL;   // ventilador encendido por post-ventilación
     en_ciclo         : BOOL;   // estados donde una falla debe detener el proceso
 
     // --- Tiempos de lote (horas de MODELO, vienen de Python) ---
@@ -60,31 +73,139 @@ VAR
     txt_comm         : STRING(10);
     txt_aire         : STRING(30);
     txt_bandeja      : STRING(15);
+    piloto_bandeja_adentro : BOOL;    // piloto HMI "Bandeja adentro" (2B2 activo y 2B1 inactivo)
     txt_vent         : STRING(12);
     txt_resist       : STRING(12);
     txt_alarma       : STRING(50);
     lim_objetivo     : REAL := 11.0;  // línea de referencia en la tendencia
     lim_capa         : REAL := 12.0;  // línea de referencia en la tendencia
+
+    // --- modo de E/S aplicado (copia de sin_fluidsim que solo cambia sin movimiento) ---
+    modo_sim         : BOOL := TRUE;  // TRUE = E/S emuladas por el PLC; FALSE = E/S de FluidSIM
+    modo_sim_ant     : BOOL := TRUE;
+    txt_modo         : STRING(50);    // texto para la HMI
+    sincronizando    : BOOL;          // llevando los cilindros de FluidSIM a la posición del PLC
+    entradas_muertas : BOOL;          // INPUT0 sin ningún final de carrera ni NC cerrado = enlace caído
+    tmr_muertas      : TON;           // filtro de 1 s para entradas_muertas
+    resinc_pendiente : BOOL;          // al reconocer una caída de FluidSIM, resincronizar cilindros
+    ult_band_adentro : BOOL;          // última posición VÁLIDA de la bandeja (enlace vivo)
+    ult_comp_inv     : BOOL;          // última posición VÁLIDA de la compuerta (enlace vivo)
+    obj_band_adentro : BOOL;          // posición objetivo de la bandeja al sincronizar
+    obj_comp_inv     : BOOL;          // posición objetivo de la compuerta al sincronizar
+
+    // --- simulación de cilindros cuando sin_fluidsim = TRUE ---
+    sim_comp_inv     : BOOL;          // TRUE = compuerta invertida (1B2)
+    sim_band_adentro : BOOL;          // TRUE = bandeja adentro (2B2)
 END_VAR
 VAR CONSTANT
     T_MOV_MAX                 : TIME := T#5S;   // tiempo máximo de carrera de un cilindro (real)
     T_ENFRIAMIENTO_H          : REAL := 0.5;    // h de modelo con ventilador sin resistencia (supuesto propio)
+    T_POSTVENT_H              : REAL := 0.1667; // 10 min de modelo de post-ventilación tras PARO o FALLA
+                                                // (práctica de calentadores de ducto; criterio propio declarado)
+    T_FS_MAX                  : TIME := T#5S;   // sin cambio del pulso de FluidSIM en 5 s -> enlace caído
+    VIGILAR_PULSO_FS          : BOOL := FALSE;  // poner TRUE cuando el oscilador KT1/KT2 esté armado en
+                                                // FluidSIM (entrada 7). Con FALSE no se vigila el enlace
+                                                // (Python recibe 0 = no informado) y el ensayo F2 no aplica.
     PERIODO_INVERSION_H       : DINT := 6;      // SECAFÉ (2008)
     PAUSA_RESIST_EN_INVERSION : BOOL := FALSE;  // FALSE en la demo acelerada (factor 540);
                                                 // TRUE solo en la verificación a tiempo real
 END_VAR
 
 // =====================================================================
-// 0. LECTURA DE FLUIDSIM (INPUT0 <- bloque "FluidSIM Out")
+// 0. LECTURA DE FLUIDSIM (INPUT0 <- bloque "FluidSIM Out") o SIMULACIÓN
 // =====================================================================
-GVL_SECUENCIA.I_EMERGENCIA_NC := GVL_SECUENCIA.INPUT0.0;   // EMERGENCY (NC)
-GVL_SECUENCIA.I_START         := GVL_SECUENCIA.INPUT0.1;   // START (NA)
-GVL_SECUENCIA.I_STOP_NC       := GVL_SECUENCIA.INPUT0.2;   // STOP (NC)
-GVL_SECUENCIA.I_1B1           := GVL_SECUENCIA.INPUT0.3;   // compuerta atrás
-GVL_SECUENCIA.I_1B2           := GVL_SECUENCIA.INPUT0.4;   // compuerta adelante
-GVL_SECUENCIA.I_2B1           := GVL_SECUENCIA.INPUT0.5;   // bandeja afuera
-GVL_SECUENCIA.I_2B2           := GVL_SECUENCIA.INPUT0.6;   // bandeja adentro
-// INPUT0.7 libre
+// el modo se aplica DE INMEDIATO, en cualquier estado . Al pasar a FluidSIM,
+// el PLC SINCRONIZA: mueve los cilindros de FluidSIM hasta la posición que tenía la simulación
+// (sección 5). Al volver a emulado, el PLC parte de la última posición real leída de FluidSIM.
+modo_sim := GVL_SECUENCIA.sin_fluidsim;
+IF modo_sim <> modo_sim_ant THEN
+    IF NOT modo_sim THEN
+        obj_band_adentro := sim_band_adentro;
+        obj_comp_inv     := sim_comp_inv;
+        sincronizando    := TRUE;
+    ELSE
+        sim_band_adentro := GVL_SECUENCIA.I_2B2;   // última posición real (ciclo anterior)
+        sim_comp_inv     := GVL_SECUENCIA.I_1B2;
+    END_IF
+    modo_sim_ant := modo_sim;
+END_IF
+
+IF modo_sim THEN
+    // Pulsadores de campo en reposo: solo manda la HMI
+    GVL_SECUENCIA.I_EMERGENCIA_NC := TRUE;
+    GVL_SECUENCIA.I_START         := FALSE;
+    GVL_SECUENCIA.I_STOP_NC       := TRUE;
+    // Cilindros simulados: llegan al final de carrera en cuanto se activa la bobina
+    // (usa las bobinas del ciclo anterior)
+    IF GVL_SECUENCIA.Q_1S1 THEN sim_comp_inv := TRUE;  END_IF
+    IF GVL_SECUENCIA.Q_2S1 THEN sim_comp_inv := FALSE; END_IF
+    IF GVL_SECUENCIA.Q_1S2 THEN sim_band_adentro := TRUE;  END_IF
+    IF GVL_SECUENCIA.Q_2S2 THEN sim_band_adentro := FALSE; END_IF
+    GVL_SECUENCIA.I_1B1 := NOT sim_comp_inv;
+    GVL_SECUENCIA.I_1B2 := sim_comp_inv;
+    GVL_SECUENCIA.I_2B1 := NOT sim_band_adentro;
+    GVL_SECUENCIA.I_2B2 := sim_band_adentro;
+ELSE
+    GVL_SECUENCIA.I_EMERGENCIA_NC := GVL_SECUENCIA.INPUT0.0;   // EMERGENCY (NC)
+    GVL_SECUENCIA.I_START         := GVL_SECUENCIA.INPUT0.1;   // START (NA)
+    GVL_SECUENCIA.I_STOP_NC       := GVL_SECUENCIA.INPUT0.2;   // STOP (NC)
+    GVL_SECUENCIA.I_1B1           := GVL_SECUENCIA.INPUT0.3;   // compuerta atrás
+    GVL_SECUENCIA.I_1B2           := GVL_SECUENCIA.INPUT0.4;   // compuerta adelante
+    GVL_SECUENCIA.I_2B1           := GVL_SECUENCIA.INPUT0.5;   // bandeja afuera
+    GVL_SECUENCIA.I_2B2           := GVL_SECUENCIA.INPUT0.6;   // bandeja adentro
+    GVL_SECUENCIA.I_FLUIDSIM_PULSO := GVL_SECUENCIA.INPUT0.7;  // pulso de vida
+END_IF
+
+// VIGILANCIA DEL ENLACE CON FLUIDSIM (dos criterios):
+//  a) Entradas muertas: si INPUT0 no trae ningún final de carrera (1B1, 1B2, 2B1, 2B2) NI los
+//     contactos NC de STOP y EMERGENCIA cerrados (bits 0, 2, 3, 4, 5, 6 en 0), el enlace está
+//     caído: físicamente cada cilindro siempre tiene un final de carrera activo, salvo en
+//     movimiento, y nunca los dos cilindros a la vez con los dos NC abiertos. Es lo que
+//     llega cuando se detiene la simulación de FluidSIM. Filtro de 1 s.
+//  b) Pulso de vida (opcional, VIGILAR_PULSO_FS): detecta además un enlace CONGELADO, en el que
+//     INPUT0 se queda con su último valor válido.
+// Con el enlace caído, STOP y EMERGENCIA de campo NO se interpretan como pulsados (sección 1):
+// la máquina pasa a FALLA 5 (recuperable), no a EMERGENCIA.
+entradas_muertas := (NOT modo_sim) AND ((GVL_SECUENCIA.INPUT0 AND 16#7D) = 0);
+tmr_muertas(IN := entradas_muertas, PT := T#1S);
+IF modo_sim OR NOT VIGILAR_PULSO_FS THEN
+    tmr_fs(IN := FALSE);
+ELSIF GVL_SECUENCIA.I_FLUIDSIM_PULSO <> pulso_fs_anterior THEN
+    tmr_fs(IN := FALSE);
+ELSE
+    tmr_fs(IN := TRUE, PT := T_FS_MAX);
+END_IF
+pulso_fs_anterior := GVL_SECUENCIA.I_FLUIDSIM_PULSO;
+falla_fluidsim := (NOT modo_sim) AND (tmr_muertas.Q OR tmr_fs.Q);
+IF falla_fluidsim THEN
+    resinc_pendiente := TRUE;                    // al reconocer: resincronizar cilindros
+END_IF
+
+IF modo_sim THEN
+    GVL_SECUENCIA.fluidsim_estado := 2;          // modo emulado, DECLARADO a Python
+ELSIF falla_fluidsim OR entradas_muertas THEN
+    GVL_SECUENCIA.fluidsim_estado := 3;          // enlace caído
+ELSE
+    GVL_SECUENCIA.fluidsim_estado := 1;          // vivo
+END_IF
+
+// Última posición VÁLIDA de los cilindros (solo con el enlace vivo y finales coherentes)
+IF NOT entradas_muertas AND NOT falla_fluidsim THEN
+    IF GVL_SECUENCIA.I_2B2 AND NOT GVL_SECUENCIA.I_2B1 THEN ult_band_adentro := TRUE;  END_IF
+    IF GVL_SECUENCIA.I_2B1 AND NOT GVL_SECUENCIA.I_2B2 THEN ult_band_adentro := FALSE; END_IF
+    IF GVL_SECUENCIA.I_1B2 AND NOT GVL_SECUENCIA.I_1B1 THEN ult_comp_inv := TRUE;  END_IF
+    IF GVL_SECUENCIA.I_1B1 AND NOT GVL_SECUENCIA.I_1B2 THEN ult_comp_inv := FALSE; END_IF
+END_IF
+
+IF sincronizando THEN
+    txt_modo := 'Sincronizando cilindros de FluidSIM...';
+ELSIF modo_sim THEN
+    txt_modo := 'MODO: SIN FLUIDSIM (E/S emuladas)';
+ELSIF falla_fluidsim OR entradas_muertas THEN
+    txt_modo := 'MODO: FLUIDSIM - SIN ENLACE';
+ELSE
+    txt_modo := 'MODO: FLUIDSIM';
+END_IF
 
 // =====================================================================
 // 1. ENTRADAS Y MANDOS
@@ -96,16 +217,21 @@ start_pulso := rt_start.Q;
 rt_nuevo(CLK := GVL_SECUENCIA.hmi_nuevo_lote);
 
 // STOP y EMERGENCIA son NC: el contacto abierto (FALSE) significa pulsado.
-// Si el cable se corta o FluidSIM no está conectado, el PLC lo ve como pulsado (falla segura).
-stop_activo := (NOT GVL_SECUENCIA.I_STOP_NC) OR GVL_SECUENCIA.hmi_stop;
-emergencia  := NOT GVL_SECUENCIA.I_EMERGENCIA_NC;
+// si el ENLACE con FluidSIM está caído (entradas muertas), esos contactos no se interpretan
+// como pulsados: la máquina va a FALLA 5 (recuperable, resistencia en 0 y post-ventilación) en
+// lugar de EMERGENCIA. Un pulsador realmente oprimido con el enlace vivo sigue funcionando,
+// porque los finales de carrera mantienen INPUT0 distinto de cero.
+stop_activo := ((NOT GVL_SECUENCIA.I_STOP_NC) AND NOT entradas_muertas) OR GVL_SECUENCIA.hmi_stop;
+emergencia  := (NOT GVL_SECUENCIA.I_EMERGENCIA_NC) AND NOT entradas_muertas;
 
 // Posición real de la compuerta
 compuerta_invertida := GVL_SECUENCIA.I_1B2 AND NOT GVL_SECUENCIA.I_1B1;
 compuerta_normal    := GVL_SECUENCIA.I_1B1 AND NOT GVL_SECUENCIA.I_1B2;
 
-// Reloj de inversión: cada 6 h de lote cambia el sentido pedido
-t_lote_h := PLC_PRG.tiempo_secado_h - t0_lote_h;
+// Reloj de inversión: cada 6 h de SECADO EFECTIVO cambia el sentido pedido.
+// usa el registro 29 (horas con calentamiento permitido) para que la post-ventilación
+// de un PARO no corra el reloj de inversión.
+t_lote_h := PLC_PRG.t_secado_efectivo_h - t0_lote_h;
 IF t_lote_h < 0.0 THEN
     t_lote_h := 0.0;
 END_IF
@@ -129,12 +255,25 @@ en_ciclo := (GVL_SECUENCIA.estado = E_ESTADO.CARGA)
 // =====================================================================
 // 3. PRIORIDADES: EMERGENCIA > FALLA > PARO (antes del CASE)
 // =====================================================================
+// ¿la resistencia tenía permiso justo antes? (salida del ciclo anterior)
+calentaba := GVL_SECUENCIA.calentar;
+
 IF emergencia THEN
     GVL_SECUENCIA.estado := E_ESTADO.EMERGENCIA;
+    pv_activa := FALSE;   // EMERGENCIA: todo en cero, sin post-ventilación (ver sección 5)
 
-ELSIF en_ciclo AND (falla_comm OR falla_fc OR tmr_mov.Q) THEN
+ELSIF en_ciclo AND (falla_comm OR falla_fluidsim OR falla_fc OR tmr_mov.Q) THEN
+    pv_activa  := calentaba;            // post-ventilación si venía calentando
+    t_pv_ini_h := PLC_PRG.t_planta_h;
+    // recordar dónde iba el lote para la recuperación (ensayo F4). Si la falla llega
+    // estando en PARO, se conserva el estado_previo que ya tenía el PARO.
+    IF GVL_SECUENCIA.estado <> E_ESTADO.PARO THEN
+        estado_previo := GVL_SECUENCIA.estado;
+    END_IF
     IF falla_comm THEN
         GVL_SECUENCIA.falla_codigo := 1;
+    ELSIF falla_fluidsim THEN
+        GVL_SECUENCIA.falla_codigo := 5;
     ELSIF tmr_mov.Q AND (mov_compuerta_inv OR mov_compuerta_norm) THEN
         GVL_SECUENCIA.falla_codigo := 2;
     ELSIF tmr_mov.Q THEN
@@ -151,6 +290,8 @@ ELSIF stop_activo AND (
       OR (GVL_SECUENCIA.estado = E_ESTADO.ENFRIAMIENTO)
       OR (GVL_SECUENCIA.estado = E_ESTADO.DESCARGA)) THEN
     estado_previo := GVL_SECUENCIA.estado;
+    pv_activa  := calentaba;            // post-ventilación si venía calentando
+    t_pv_ini_h := PLC_PRG.t_planta_h;
     GVL_SECUENCIA.estado := E_ESTADO.PARO;
 END_IF
 
@@ -168,14 +309,17 @@ E_ESTADO.REPOSO:
         GVL_SECUENCIA.falla_codigo := 0;
     // 2) START: arranca el ciclo solo si hay un lote preparado y todo está sano.
     ELSIF start_pulso AND GVL_SECUENCIA.lote_preparado
-          AND NOT stop_activo AND NOT falla_comm AND NOT falla_fc THEN
+          AND NOT stop_activo AND NOT falla_comm AND NOT falla_fc AND NOT falla_fluidsim
+          AND NOT sincronizando THEN
+        // es un ENCLAVAMIENTO DE MÁQUINA (no arrancar sin E/S de campo), no una pausa de la
+        // física: Python sigue integrando la planta con o sin CODESYS/FluidSIM.
         GVL_SECUENCIA.estado := E_ESTADO.CARGA;
     END_IF
 
 E_ESTADO.CARGA:
     // Bandeja adentro (2B2) y compuerta en posición normal (1B1)
     IF GVL_SECUENCIA.I_2B2 AND NOT GVL_SECUENCIA.I_2B1 AND compuerta_normal THEN
-        t0_lote_h := PLC_PRG.tiempo_secado_h;  // el reloj de inversión empieza en 0
+        t0_lote_h := PLC_PRG.t_secado_efectivo_h;  // el reloj de inversión empieza en 0
         GVL_SECUENCIA.estado := E_ESTADO.SECADO;
     END_IF
 
@@ -213,15 +357,28 @@ E_ESTADO.DESCARGA:
 
 E_ESTADO.PARO:
     // Amarilla fija. START (con STOP ya suelto) continúa donde iba.
-    IF start_pulso AND NOT stop_activo THEN
+    // no reanuda mientras se sincronizan los cilindros de FluidSIM.
+    IF start_pulso AND NOT stop_activo AND NOT sincronizando THEN
         GVL_SECUENCIA.estado := estado_previo;
     END_IF
 
 E_ESTADO.FALLA:
     // Roja intermitente. START reconoce la falla si la causa ya desapareció.
-    IF start_pulso AND NOT falla_comm AND NOT falla_fc THEN
+    // el lote NO se reinicia. El primer START
+    // reconoce la falla y deja la máquina en PARO; un segundo START reanuda donde iba
+    // (mismo lote, misma energía y mismo reloj de inversión). Python nunca dejó de integrar.
+    IF start_pulso AND NOT falla_comm AND NOT falla_fc AND NOT falla_fluidsim
+       AND NOT entradas_muertas THEN
         GVL_SECUENCIA.falla_codigo := 0;
-        GVL_SECUENCIA.estado := E_ESTADO.REPOSO;
+        GVL_SECUENCIA.estado := E_ESTADO.PARO;
+        // si FluidSIM se cayó, al reiniciarse sus cilindros vuelven a la posición inicial
+        // del circuito: se llevan a la última posición válida antes de reanudar.
+        IF resinc_pendiente THEN
+            obj_band_adentro := ult_band_adentro;
+            obj_comp_inv     := ult_comp_inv;
+            sincronizando    := TRUE;
+            resinc_pendiente := FALSE;
+        END_IF
     END_IF
 
 E_ESTADO.EMERGENCIA:
@@ -237,9 +394,25 @@ END_CASE
 // 5. SALIDAS: se calculan a partir del estado (nada queda "pegado")
 // =====================================================================
 // --- Interfaz con PLC_PRG / Python ---
+// POLÍTICA DE PARADA 
+//   - PARO y FALLA: resistencia en cero de inmediato; si venía calentando, el ventilador
+//     sigue T_POSTVENT_H para sacar el calor del ducto (evita sobretemperatura de los
+//     elementos) y luego se apaga. Si la falla es la comunicación con Python, CODESYS no
+//     puede mandar nada útil: aplica la política local de Python (misma post-ventilación).
+//   - EMERGENCIA: TODAS las salidas en cero, incluido el ventilador (parada de todo
+//     movimiento; el sobrecalentamiento lo cubre el corte térmico de la resistencia). En una
+//     implementación real, la salida del ventilador en emergencia se decide con la evaluación
+//     de riesgos (ISO 12100); esto es una función de software demostrada, no una
+//     certificación de seguridad.
+post_vent := ((GVL_SECUENCIA.estado = E_ESTADO.PARO) OR (GVL_SECUENCIA.estado = E_ESTADO.FALLA))
+             AND pv_activa AND NOT falla_comm
+             AND (PLC_PRG.t_planta_h > 0.0)   // sin los canales 33-34 no hay reloj: sin post-ventilación
+             AND (PLC_PRG.t_planta_h >= t_pv_ini_h) // si Python se reinició, su reloj volvió a 0: se termina
+             AND ((PLC_PRG.t_planta_h - t_pv_ini_h) < T_POSTVENT_H);
 GVL_SECUENCIA.ventilador := (GVL_SECUENCIA.estado = E_ESTADO.SECADO)
                          OR (GVL_SECUENCIA.estado = E_ESTADO.INVERSION)
-                         OR (GVL_SECUENCIA.estado = E_ESTADO.ENFRIAMIENTO);
+                         OR (GVL_SECUENCIA.estado = E_ESTADO.ENFRIAMIENTO)
+                         OR post_vent;
 
 GVL_SECUENCIA.calentar := (GVL_SECUENCIA.estado = E_ESTADO.SECADO)
                        OR ((GVL_SECUENCIA.estado = E_ESTADO.INVERSION) AND NOT PAUSA_RESIST_EN_INVERSION);
@@ -261,6 +434,25 @@ mov_compuerta_norm := (((GVL_SECUENCIA.estado = E_ESTADO.INVERSION) AND NOT sent
 // La bandeja solo se mueve con el ventilador apagado (CARGA y DESCARGA no lo encienden)
 mov_bandeja_adentro := (GVL_SECUENCIA.estado = E_ESTADO.CARGA) AND NOT GVL_SECUENCIA.I_2B2;
 mov_bandeja_afuera  := (GVL_SECUENCIA.estado = E_ESTADO.DESCARGA) AND NOT GVL_SECUENCIA.I_2B1;
+
+// SINCRONIZACIÓN al pasar a FluidSIM. Mueve cada cilindro de FluidSIM hasta la posición que
+// tenía la simulación y termina cuando los finales de carrera la confirman. Si un cilindro no
+// llega en T_MOV_MAX, la vigilancia de carrera (tmr_mov) lleva a FALLA 2 o 3. Se cancela en
+// FALLA o EMERGENCIA (en EMERGENCIA no se mueve nada).
+IF sincronizando THEN
+    IF (GVL_SECUENCIA.estado = E_ESTADO.FALLA) OR (GVL_SECUENCIA.estado = E_ESTADO.EMERGENCIA)
+       OR entradas_muertas THEN
+        sincronizando := FALSE;
+    ELSE
+        mov_bandeja_adentro := obj_band_adentro AND NOT GVL_SECUENCIA.I_2B2;
+        mov_bandeja_afuera  := (NOT obj_band_adentro) AND NOT GVL_SECUENCIA.I_2B1;
+        mov_compuerta_inv   := obj_comp_inv AND NOT GVL_SECUENCIA.I_1B2;
+        mov_compuerta_norm  := (NOT obj_comp_inv) AND NOT GVL_SECUENCIA.I_1B1;
+        IF NOT (mov_bandeja_adentro OR mov_bandeja_afuera OR mov_compuerta_inv OR mov_compuerta_norm) THEN
+            sincronizando := FALSE;   // FluidSIM ya está donde estaba la simulación
+        END_IF
+    END_IF
+END_IF
 
 // --- Bobinas de las válvulas 5/2 biestables (nunca las dos de una válvula a la vez) ---
 GVL_SECUENCIA.Q_1S1 := mov_compuerta_inv   AND NOT mov_compuerta_norm;
@@ -320,7 +512,12 @@ CASE GVL_SECUENCIA.estado OF
     E_ESTADO.ENFRIAMIENTO: GVL_SECUENCIA.estado_txt := 'ENFRIAMIENTO';
     E_ESTADO.FIN_SECADO:   GVL_SECUENCIA.estado_txt := 'FIN DE SECADO';
     E_ESTADO.DESCARGA:     GVL_SECUENCIA.estado_txt := 'DESCARGA';
-    E_ESTADO.PARO:         GVL_SECUENCIA.estado_txt := 'PARO';
+    E_ESTADO.PARO:
+        IF post_vent THEN
+            GVL_SECUENCIA.estado_txt := 'PARO - POST-VENTILACION';
+        ELSE
+            GVL_SECUENCIA.estado_txt := 'PARO';
+        END_IF
     E_ESTADO.FALLA:        GVL_SECUENCIA.estado_txt := 'FALLA';
     E_ESTADO.EMERGENCIA:   GVL_SECUENCIA.estado_txt := 'EMERGENCIA';
 END_CASE
@@ -331,6 +528,7 @@ CASE GVL_SECUENCIA.falla_codigo OF
     2: GVL_SECUENCIA.falla_txt := 'Compuerta trabada (1B1/1B2)';
     3: GVL_SECUENCIA.falla_txt := 'Bandeja trabada (2B1/2B2)';
     4: GVL_SECUENCIA.falla_txt := 'Finales de carrera incoherentes';
+    5: GVL_SECUENCIA.falla_txt := 'Sin enlace con FluidSIM (OPC)';
 END_CASE
 
 // =====================================================================
@@ -352,6 +550,7 @@ ELSE
     txt_aire := 'NORMAL (abajo -> arriba)';
 END_IF
 
+piloto_bandeja_adentro := GVL_SECUENCIA.I_2B2 AND NOT GVL_SECUENCIA.I_2B1;
 IF GVL_SECUENCIA.I_2B2 AND NOT GVL_SECUENCIA.I_2B1 THEN
     txt_bandeja := 'ADENTRO';
 ELSIF GVL_SECUENCIA.I_2B1 AND NOT GVL_SECUENCIA.I_2B2 THEN

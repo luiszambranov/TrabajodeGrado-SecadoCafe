@@ -6,7 +6,7 @@ Lecho estático de café pergamino por capas (modelo de Thompson), con la
 cinética de capa delgada de Roa-Cenicafé (cinetica_roa.py) en cada capa.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
-Por qué hace falta (29 sept 2026)
+Por qué hace falta
 ----------------------------------
 Con el caudal específico recomendado por Cenicafé (0.1 m3/min por kg
 c.p.s.; González et al., 2010), el aire a 50 °C puede llevarse como
@@ -38,7 +38,7 @@ escritas en SI)
     de Thompson: el aire no puede cargar más agua que la de saturación).
  7. Grano y aire salen a Tf; el aire (Tf, w+Δw) entra a la capa siguiente.
 
-Con el ventilador apagado (21 oct 2026, ``paso_reposo``): el lecho NO se
+Con el ventilador apagado (``paso_reposo``): el lecho NO se
 congela. (a) Pierde calor por sus superficies hacia el ambiente por
 convección natural (UA = h_conv_natural * area_perdidas_lecho, repartido
 por igual entre capas: simplificación declarada); (b) lo atraviesa el
@@ -46,7 +46,7 @@ pequeño caudal de tiro natural (efecto chimenea, dinamica_termica.
 masa_aire_tiro_natural_kg_s) con el mismo algoritmo de Thompson, así que
 sigue secándose un poco con el calor que conserva (o se rehumedece si el
 aire está más húmedo que su equilibrio), y el aire no puede salir
-sobresaturado. Antes (hasta el 20 oct 2026) el lecho quedaba congelado.
+sobresaturado.
 Ficha: data/reference/reposo_tiro_natural.md.
 
 Referencias

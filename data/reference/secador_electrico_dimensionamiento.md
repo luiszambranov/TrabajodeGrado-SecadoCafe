@@ -1,6 +1,6 @@
 # Secador eléctrico de la propuesta supervisada — dimensionamiento y fuentes
 
-Decisión de diseño (29 sept 2026): **lote de 80 kg de café pergamino seco
+Decisión de diseño: **lote de 80 kg de café pergamino seco
 (c.p.s.)**, calentamiento con **resistencia eléctrica**. Implementado en
 `python/dinamica_termica.py` (`ParametrosSecador`), `python/lecho_secado.py`
 (lecho por capas) y `python/secador_electrico.py`.
@@ -17,7 +17,7 @@ Control de caudal y temperatura de aire en el secado mecánico de café.
 | Caudal específico óptimo, lecho estático | **0.1 m³/min por kg c.p.s.** | 80 kg → 8.0 m³/min |
 | Espesores evaluados | 20, 30, 40, 54 cm (menor espesor = mayor ahorro) | Lecho de **20 cm** |
 | Ventilador del secador experimental | 4.95 kW para 2 000 kg c.p.s. (2.475 W/kg) | 80 kg → **0.20 kW** (escalado lineal, mismo caudal específico y espesor) |
-| Resultado experimental | ~49 h promedio, pero para **café semilla a 38 °C** (no café comercial a 50 °C) | **No sirve como validación** del secador a 50 °C (corrección del 4 oct 2026; ver sección 3) |
+| Resultado experimental | ~49 h promedio, pero para **café semilla a 38 °C** (no café comercial a 50 °C) | **No sirve como validación** del secador a 50 °C (ver sección 3) |
 
 ## 2. Potencia de la resistencia
 
@@ -90,7 +90,7 @@ resultado cambia ≤ 0.25 h.
 Sin inversión del aire, al final la capa inferior queda en 6.6 % b.h. y la
 superior en 16.9 % b.h. (gradiente típico de lecho estático).
 
-### Inversión del sentido del aire (modelada el 29 sept 2026)
+### Inversión del sentido del aire
 
 Cenicafé invierte el sentido del aire en los secadores estáticos cada 6 h
 (SECAFÉ, 2008: secador estático con "inversión del sentido del flujo de aire
@@ -147,7 +147,7 @@ llegar a 50 °C. Es despreciable frente a las ~33 h de secado. UA es el 2 % de
   582–586.
 
 
-## 6. Validación contra Cenicafé (corrección del 4 oct 2026)
+## 6. Validación contra Cenicafé
 
 El "~49 h" que se usaba antes como referencia de González et al. (2010)
 corresponde a **café semilla secado a 38 °C**, así que no sirve para validar
@@ -171,7 +171,7 @@ documento. Causas probables, por revisar:
 3. El caudal de "100 m³/min/t" de Cenicafé puede referirse a la capacidad
    total del silo (todos los pisos), no a cada capa.
 
-Opción si el asesor pide cerrar la brecha: calibrar el coeficiente `m` de
+Opción para cerrar la brecha en un trabajo futuro: calibrar el coeficiente `m` de
 la ecuación de Roa (o la eficiencia del lecho) para que el modelo dé
 ~24 h en las condiciones de Oliveros et al. (2010), y reportar el valor
 calibrado junto con el original.

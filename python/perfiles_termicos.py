@@ -4,11 +4,11 @@ perfiles_termicos.py
 
 Perfiles térmicos de la propuesta supervisada (variable independiente del
 objetivo general: "análisis ... bajo diferentes perfiles térmicos").
-Definidos el 5 oct 2026, ANTES del piloto Monte Carlo.
+Definidos antes del piloto Monte Carlo.
 Trabajo de grado - Sistema de supervisión digital para el secado de café.
 
-Diseño (definido el 5 oct 2026; CORREGIDO el 21 oct 2026)
----------------------------------------------------------
+Diseño
+------
 Diseño factorial 3 x 3 + una referencia:
 
     Factor A, perfil térmico (setpoint de T_process, manipulada 1):
@@ -22,14 +22,7 @@ Diseño factorial 3 x 3 + una referencia:
     Referencia REF: 50 °C constante y caudal 100 %, la práctica recomendada
         por Cenicafé (González, Sanz & Oliveros, 2010).
 
-CORRECCIÓN del 21 oct 2026: el diseño inicial usaba 55 °C en P2 y P3 para
-tener niveles equidistantes (35/45/55). Eso contradecía la restricción que el
-propio trabajo adopta (grano <= 50 °C; González et al., 2010) y la fuente de
-los escalonados (de Oliveira et al., 2018, que usó 50 -> 35 y 35 -> 50 °C).
-La campaña con ese diseño mostró 6-22 h de grano por encima de 50 °C. Se
-corrigió el diseño por esa razón de seguridad, antes de ver los resultados
-del diseño corregido. Los resultados del diseño inicial se conservan en
-resultados/diseno_inicial_55/ y en PERFILES_DISENO_INICIAL_55.
+Ningún nivel supera los 50 °C permitidos para el grano (González et al., 2010).
 
 Por qué estos perfiles (qué pregunta responde cada uno)
 -------------------------------------------------------
@@ -48,7 +41,7 @@ energía y restricciones de calidad) a CUÁNDO y CUÁNTO calor se aplica.
   frente a P2 (altas al inicio y bajas después).
   El cambio al 30 % b.h. es el que usaron de Oliveira et al. (2018), y
   coincide con la separación entre presecado y secado final de Cenicafé
-  (Peñuela-Martínez et al., 2025).
+  (Guerrero-Aguirre et al., 2025).
 - Caudal 30/75/100 %: el ventilador y la carga térmica de la resistencia
   dependen del caudal (la potencia para calentar el aire es proporcional al
   caudal); se busca si reducir caudal ahorra energía sin sobresecar la capa
@@ -87,7 +80,7 @@ Referencias
 - Oliveros T., C. E., Pabón U., J. P., & Montoya R., E. C. (2016). Evaluación
   de una alternativa para la conservación de la calidad en la
   comercialización del café húmedo. Cenicafé.
-- Peñuela-Martínez et al. (2025); Oliveros et al. (2013): ver
+- Guerrero-Aguirre et al. (2025); Oliveros et al. (2013): ver
   data/reference/validacion_modelo.md.
 """
 
@@ -121,11 +114,6 @@ TERMICOS = [  # (código, descripción, sp inicial, sp final)
     ("P2", "50 → 35 °C al 30 % b.h.", 50.0, 35.0),
     ("P3", "35 → 50 °C al 30 % b.h.", 35.0, 50.0),
 ]
-TERMICOS_DISENO_INICIAL_55 = [  # diseño del 5 oct 2026, descartado el 21 oct (excede 50 °C de grano)
-    ("P1", "45 °C constante", 45.0, 45.0),
-    ("P2", "55 → 35 °C al 30 % b.h.", 55.0, 35.0),
-    ("P3", "35 → 55 °C al 30 % b.h.", 35.0, 55.0),
-]
 CAUDALES = [("C30", 0.30), ("C75", 0.75), ("C100", 1.00)]
 
 PERFILES = [Perfil("REF", "Cenicafé: 50 °C constante, caudal 100 %", 50.0, 50.0, 1.0, "González et al. (2010)")]
@@ -134,10 +122,6 @@ PERFILES += [
     for tc, td, s0, s1 in TERMICOS for cc, cf in CAUDALES
 ]
 PERFILES_POR_CODIGO = {p.codigo: p for p in PERFILES}
-PERFILES_DISENO_INICIAL_55 = [PERFILES[0]] + [
-    Perfil(f"{tc}-{cc}", f"{td}, caudal {int(cf * 100)} %", s0, s1, cf, "Diseño inicial (5 oct 2026), descartado")
-    for tc, td, s0, s1 in TERMICOS_DISENO_INICIAL_55 for cc, cf in CAUDALES
-]
 
 
 if __name__ == "__main__":

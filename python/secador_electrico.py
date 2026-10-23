@@ -15,7 +15,7 @@ Lo usan dos clientes con la MISMA física:
       lógica de PLC_PRG para la campaña Monte Carlo (reproducible por
       semilla, sin tiempo real).
 
-Relojes (21 oct 2026)
+Relojes
 ---------------------
 - ``t_fisico_h``: reloj de la PLANTA (hora del clima; t = 0 es la
   medianoche del día 0 más ``t_inicio_h``). Avanza siempre, también con
@@ -97,7 +97,7 @@ class SecadorElectrico:
         """Carga un lote nuevo: café a la temperatura ambiente con la humedad
         inicial, tiempo del lote y contadores en cero. La CÁMARA (plenum)
         conserva su temperatura y el reloj de la planta sigue: un lote nuevo
-        no enfría la cámara instantáneamente (guía de cierre, R4)."""
+        no enfría la cámara instantáneamente."""
         t_amb, _, _ = amb.ambiente_en(self.t_fisico_h, self.clima)
         self.lecho = LechoThompson(self.p, m0_bh_pct=m0_bh_pct, t_inicial_c=t_amb)
         self.c = Contadores()

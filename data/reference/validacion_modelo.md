@@ -1,4 +1,4 @@
-# Validación del modelo contra datos independientes (5 oct 2026)
+# Validación del modelo contra datos independientes
 
 Script: `python/validacion_modelo.py` (reproduce todos los números).
 
@@ -17,9 +17,9 @@ distintos, para no apoyarse en un solo caso.
 | # | Tipo de secado | Fuente (independiente) | Dato real | Modelo | Error |
 |---|---|---|---|---|---|
 | V1 | Capa delgada en laboratorio, 9 condiciones (50–70 °C, 10–30 % HR) | Phitakwinai et al. (2019), *Food Sci. Nutr.* 7(9) | Tiempo hasta MR = 0.2: 5.9–14.5 h | 5.4–14.3 h | **7.2 % medio**, RMSE 0.76 h (≤ 2 % a 50 °C; hasta −19 % a 70 °C) |
-| V2 | Patio al sol, condiciones medias | Eliseu (2008), café robusta, Brasil | 117.5 h | 125.6 h | **+6.9 %** |
+| V2 | Patio al sol, condiciones medias | Resende et al. (2009), café robusta, Brasil | 117.5 h | 125.6 h | **+6.9 %** |
 | V3 | Secador mecánico de lecho estático (30 cm, 125 kg, 48 °C, 15 h/día, inversión cada 7.5 h) | Martínez-Tovar & Álvarez-Hernández (2006), *Cenicafé* 57(2) — Escafé | ~3 d; 7 297 kJ/kg agua; capas 8.4–12.7 % | 1.7–2.3 d; **6 962–8 560 kJ/kg**; capas 9.3–10.4 % | Tiempo **−25 a −45 %**; energía **−5 a +17 %** |
-| V4 | Secado solar, grupo de 1 061–1 399 h/año de sol (predicho, no calibrado) | Peñuela-Martínez et al. (2025), Avances Técnicos Cenicafé | 15.5 d (rango 5.2–36.1) | 11.7 d | **−24 %**, dentro del rango |
+| V4 | Secado solar, grupo de 1 061–1 399 h/año de sol (predicho, no calibrado) | Guerrero-Aguirre et al. (2025), Avances Técnicos Cenicafé | 15.5 d (rango 5.2–36.1) | 11.7 d | **−24 %**, dentro del rango |
 
 Contraste adicional (no son validación estricta, ver sección 2):
 
@@ -74,14 +74,14 @@ solares, esa incertidumbre no cambia la conclusión de la comparación.
 - Phitakwinai, P., Thepa, S., & Nilnont, W. (2019). Thin-layer drying of
   parchment Arabica coffee by controlling temperature and relative humidity.
   *Food Science & Nutrition, 7*(9), 2921–2931. https://doi.org/10.1002/fsn3.1144
-- Eliseu (2008): ver `eliseu_2008_secado_patio.md`.
+- Resende et al. (2009): ver `resende_2009_secado_patio.md`.
 - Martínez-Tovar, D. G., & Álvarez-Hernández, J. R. (2006). Aprovechamiento
   de la energía calórica de estufas campesinas para el secado del café en
   fincas. *Cenicafé, 57*(2), 88–99.
   https://www.cenicafe.org/es/publications/arc057%2802%29088-099.pdf
-- Peñuela-Martínez, A. E., Osorio Giraldo, C. V., Guerrero, A., &
-  Sanz-Uribe, J. R. (2025). *Manejo del café en el secado solar*. Avances
-  Técnicos Cenicafé. https://doi.org/10.38141/10779/0577
+- Guerrero-Aguirre, Á., Sanz-Uribe, J. R., Peñuela-Martínez, A. E., &
+  Osorio-G., C. V. (2025). *Manejo del café en el secado solar* (Avances
+  Técnicos No. 577). Cenicafé. https://doi.org/10.38141/10779/0577
 - Oliveros-Tascón, C. E., Ramírez-Gómez, C. A., Sanz-Uribe, J. R.,
   Peñuela-Martínez, A. E., & Pabón-Usaquén, J. (2013). Secado solar y
   secado mecánico del café. Cenicafé.

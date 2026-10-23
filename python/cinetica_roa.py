@@ -7,11 +7,10 @@ isoterma de equilibrio de Roa (Trejos et al., 1989) + ecuacion unificada de
 secado en capa delgada de Roa (Parra-Coronado et al., 2008 - SECAFE).
 Trabajo de grado - Sistema de supervision digital para el secado de cafe.
 
-Por que este modelo (decision del 29 sept 2026)
--------------------------------------------------
-El informe de prioridades del asesor (25 sept 2026) pide cerrar el dominio
-T-HR del modelo antes del Monte Carlo. Phitakwinai et al. (2019), usado en
-legacy/cinetica_dinamica.py, solo es valido en 50-70 C / 10-30 % HR, mientras las
+Por que este modelo
+-------------------
+El dominio T-HR del modelo debe cubrir todo lo que recorre la simulacion.
+El modelo de Phitakwinai et al. (2019) solo es valido en 50-70 C / 10-30 % HR, mientras las
 tres estrategias recorren aprox. 15-65 C / 5-100 % HR (ambiente de
 Chinchina, secado en patio, solar activo, calentamiento y enfriamiento de
 la propuesta supervisada). El modelo de Roa-Cenicafe:
@@ -63,8 +62,7 @@ Ecuaciones
 
 Integracion bajo condiciones variables (tiempo equivalente, Thompson)
 -----------------------------------------------------------------------
-Mismo criterio cuasi-estacionario que legacy/cinetica_dinamica.py y que el modelo
-de Thompson usado en SECAFE: en cada paso, con las condiciones ACTUALES
+Criterio cuasi-estacionario del modelo de Thompson usado en SECAFE: en cada paso, con las condiciones ACTUALES
 (T, HR) se calculan Me y k, se busca el tiempo equivalente
 
        tau = [-ln(MR) / k]^(1/q),   MR = (M - Me)/(M0 - Me)
@@ -74,8 +72,8 @@ y se avanza el paso de forma EXACTA para la ecuacion lineal en (M - Me):
        M_nuevo - Me = (M - Me) * exp(-k * [(tau + dt)^q - tau^q])
 
 Con condiciones constantes esto reproduce exactamente la curva analitica
-MR = exp(-k*t^q) (chequeo de consistencia dinamico vs estatico que pide
-el asesor; ver el smoke test al final del modulo).
+MR = exp(-k*t^q) (chequeo de consistencia dinamico vs estatico; ver la
+prueba al final del modulo).
 
 Rehumectacion (M < Me): ocurre en patio o con el calentador apagado en
 noches humedas (Me de hasta ~19 % b.h. a 20 C / 97 % HR). La isoterma de
@@ -88,7 +86,7 @@ Convencion de unidades
 -----------------------
     Internamente: M, Me en % base SECA (como las fuentes).
     Interfaz: funciones de conversion a/desde % base humeda, que es la
-    convencion de reporte del proyecto (legacy/modelo_secado.py).
+    convencion de reporte del proyecto.
     T en C, HR en % (0-100), t en h.
 
 Referencias

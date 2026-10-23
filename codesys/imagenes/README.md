@@ -18,4 +18,6 @@ Creados para este proyecto (sin licencias de terceros).
 | boton_start / _pulsado | Conmutador de imagen, comportamiento "Pulsador de imagen" | `GVL_SECUENCIA.hmi_start` |
 | boton_stop / _pulsado | Conmutador de imagen, comportamiento "Pulsador de imagen" | `GVL_SECUENCIA.hmi_stop` |
 
-`_vista_previa_sinoptico.png`: cómo queda el sinóptico armado (referencia, no va al ImagePool).
+`_vista_previa_sinoptico.png` / `.svg` y `_hoja_iconos.png`: cómo queda el sinóptico armado y todos los iconos juntos (referencia, no van al ImagePool).
+
+`ConductoInversion.png`, `CompuertaInversion.png`, `Invertidoabajo.png` y `Flecha.png`: piezas del dibujo del conducto de inversión del aire y la flecha de sentido usadas en la pantalla final.
