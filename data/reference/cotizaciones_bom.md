@@ -106,12 +106,12 @@ producto cotizado, el enlace donde se encontró y la verificación de que sirve 
 | Cableado, borneras, canaleta y riel | 10 % de los equipos eléctricos (10 105 453); supuesto | 1 010 545 |
 | Consumibles del kit de inversión | 10 % de su estructura (tornillería, remaches, silicona de alta temperatura, pintura); supuesto | 65 792 |
 | Fabricación del kit de inversión | 16 h × 30 000 COP/h de taller metalmecánico; supuesto | 480 000 |
-| Ingeniería, programación y puesta en marcha | 60 h × 60 000 COP/h; supuesto | 3 600 000 |
-| **CAPEX A** | | **20 307 081** |
+| Ingeniería, programación y puesta en marcha | 60 h × 100 000 COP/h (tarifa de integración de automatización de nivel medio-senior); supuesto | 6 000 000 |
+| **CAPEX A** | | **22 707 081** |
 | Estructura de la cámara (B) | Tabla | 1 176 700 |
 | Consumibles de la cámara | 10 % de su estructura; supuesto | 117 670 |
 | Fabricación de la cámara | 40 h × 30 000 COP/h; supuesto | 1 200 000 |
-| **CAPEX B** | | **22 801 451** |
+| **CAPEX B** | | **25 201 451** |
 
 ## Alternativas y notas
 

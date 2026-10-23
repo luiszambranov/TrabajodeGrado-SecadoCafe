@@ -159,7 +159,7 @@ cable = round(0.10 * elec)
 cons_A = round(0.10 * struct_A)
 cons_B = round(0.10 * struct_B)
 taller_A, taller_B = 16 * 30000, 40 * 30000
-ing = 60 * 60000
+ing = 60 * 100000
 mat_A = tot(A)
 capex_A = mat_A + cable + cons_A + taller_A + ing
 capex_B = capex_A + tot(B) + cons_B + taller_B
@@ -233,7 +233,7 @@ def write_md(path):
     a(f"| Cableado, borneras, canaleta y riel | 10 % de los equipos eléctricos ({cop(elec)}); supuesto | {cop(cable)} |")
     a(f"| Consumibles del kit de inversión | 10 % de su estructura (tornillería, remaches, silicona de alta temperatura, pintura); supuesto | {cop(cons_A)} |")
     a(f"| Fabricación del kit de inversión | 16 h × 30 000 COP/h de taller metalmecánico; supuesto | {cop(taller_A)} |")
-    a(f"| Ingeniería, programación y puesta en marcha | 60 h × 60 000 COP/h; supuesto | {cop(ing)} |")
+    a(f"| Ingeniería, programación y puesta en marcha | 60 h × 100 000 COP/h (tarifa de integración de automatización de nivel medio-senior); supuesto | {cop(ing)} |")
     a(f"| **CAPEX A** | | **{cop(capex_A)}** |")
     a(f"| Estructura de la cámara (B) | Tabla | {cop(struct_B)} |")
     a(f"| Consumibles de la cámara | 10 % de su estructura; supuesto | {cop(cons_B)} |")

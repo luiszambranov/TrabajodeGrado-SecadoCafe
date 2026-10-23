@@ -121,7 +121,8 @@ figura en `../figures/`.
 | `efecto_clima.py` | ¿Cambia el orden de las estrategias con clima seco, húmedo, frío o caliente? 12 corridas dirigidas para REF, P1-C75 y las solares. | `resultados/efecto_clima/` |
 | `sensibilidad_tornado.py` | ¿Qué parámetro del modelo pesa más? ±20 % de la cinética, el caudal, las pérdidas de calor y el espesor del lecho, uno a la vez. | `resultados/sensibilidad/` |
 | `corrida_instrumentada.py` | La corrida supervisada registrada minuto a minuto (consigna, temperatura lograda, potencia, ciclo de trabajo, saturación). La usa `limites_actuacion.py`. | — |
-| `balance_energia.py` | Energía eléctrica, solar y por kg de agua de las tres estrategias en el día nominal. Base del análisis económico. | Imprime la tabla |
+| `balance_energia.py` | Energía eléctrica, solar y por kg de agua de las tres estrategias en el día nominal. | Imprime la tabla |
+| `analisis_financiero.py` | Evaluación financiera preliminar: VPN, TIR y recuperación (simple y descontada) de la adaptación (A) y del sistema completo (B) en escenarios conservador, central y favorable; valor presente del cambio REF → P1-C75; sensibilidad de un factor a la vez y costo académico de la asesoría. Cada dato está marcado como dato (con fuente) o supuesto. | `resultados/financiero/flujos_financieros.xlsx` (con fórmulas VNA y TIR) y `resumen.md` |
 | `validacion_modelo.py` | Compara el modelo con 4 casos independientes: laboratorio (Phitakwinai et al., 2019), patio (Resende et al., 2009), secador Escafé (Martínez-Tovar y Álvarez, 2006) y secado solar (Guerrero-Aguirre et al., 2025). | Imprime la tabla; detalle en `../data/reference/validacion_modelo.md` |
 | `graficas_perfiles.py` | Figuras de cada perfil térmico en el día nominal, con el instante de cambio de consigna. | `../figures/perfil_*.png`, `perfiles_resumen.png` |
 
@@ -145,6 +146,7 @@ Valores de `--perfil`: `REF`, `P1-C30`, `P1-C75`, `P1-C100`, `P2-…`, `P3-…`.
 | `limites_actuacion/` | Casos de límites de actuación (`resumen.md`, `casos.csv`). |
 | `efecto_clima/` | Corridas con los niveles de clima (`resumen.md`, `corridas.csv`). |
 | `sensibilidad/` | Sensibilidad ±20 % (`resumen_tornado.md`, `tornado.csv`). |
+| `financiero/` | Flujos de caja, VPN, TIR y recuperación por escenario (`flujos_financieros.xlsx`, `resumen.md`). |
 | `ensayos/` | CSV de los ensayos de falla con CODESYS y FluidSIM (`F1_codesys`, `F2_fluidsim`, `F3_Stop`, `F5_python`), captura de la HMI en F5, ensayo de continuidad y `resumen_ensayos.md`. |
 | `verificacion/` | Tres lotes completos supervisados por CODESYS (semillas 1001 y 1002, perfiles REF y P1-C75) con su gráfica, para comparar con la réplica. |
 | `lotes/` | Lote completo P3-C100 supervisado por CODESYS (CSV y gráfica). Aquí guarda el servidor cada nueva corrida. |
