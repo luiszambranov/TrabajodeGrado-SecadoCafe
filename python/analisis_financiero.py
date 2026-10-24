@@ -147,7 +147,7 @@ ESCENARIOS = {
 
 
 MIN_INVERSION = 20.0     # supuesto: minutos de operario por inversión manual del aire
-H_MUESTREO = 1.0         # supuesto: horas de muestreo de humedad al final del lote
+H_MUESTREO = 0.0         # el muestreo final de humedad sigue siendo manual con o sin el sistema: no se cuenta
 FRACCION_NOCHE = 0.5     # el lote dura más de un día: la mitad de las horas cae de 18:00 a 06:00
 RECARGO_NOCTURNO = 0.35  # Código Sustantivo del Trabajo, art. 168
 # Fracción de lotes que se pueden secar con P1-C75 sin superar la capacidad en el pico de cosecha
@@ -320,7 +320,7 @@ def escribir_excel(res: list[dict], ruta: str) -> None:
         ("Licencias de software [COP]", 0, "Dato", "CODESYS Development System gratuito; WebVisu incluido en el controlador"),
         ("Ingeniería por unidad [COP]", INGENIERIA, "Supuesto", "24 h x 100 000 COP/h: adaptación del programa existente y puesta en marcha"),
         ("Minutos por inversión manual del aire", MIN_INVERSION, "Supuesto", "Mover la compuerta y verificar"),
-        ("Muestreo de humedad al final del lote [h]", H_MUESTREO, "Supuesto", "Varias muestras para decidir el fin"),
+        ("Muestreo de humedad al final del lote [h]", H_MUESTREO, "Supuesto", "No se cuenta como ahorro: el muestreo final sigue siendo manual"),
         ("Recargo nocturno", RECARGO_NOCTURNO, "Dato", "Código Sustantivo del Trabajo, art. 168; la mitad de las horas del lote es nocturna"),
         ("Tarifa no residencial [COP/kWh]", TARIFA_NO_RES, "Dato", "CHEC, sept 2026, nivel 1, comercial e industrial (uso productivo del secador)"),
         ("Tarifa residencial (sensibilidad) [COP/kWh]", TARIFA_RES, "Dato", "CHEC, sept 2026, nivel 1, residencial sobre subsistencia"),

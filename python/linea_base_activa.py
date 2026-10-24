@@ -23,7 +23,7 @@ Uso principal: ``condiciones_activa(clima_dias)`` (lo llama
 linea_base_activa.py`` imprime el mapa de calibracion.
 
 Referencias: ver docs/seleccion_lineas_base.md (Duque-Dussan et al., 2026;
-Meja et al., 2025; Guerrero-Aguirre et al., 2025).
+Meja et al., 2025; Penuela-Martinez et al., 2025).
 """
 
 from __future__ import annotations
@@ -81,14 +81,14 @@ import numpy as np
 # Las tres estrategias secan el MISMO lote: 80 kg de cafe pergamino seco
 # (158 kg humedos a 55 % b.h.). En secado solar el cafe se extiende en
 # CAPA DELGADA de 2 cm (capacidad de diseno de los secadores solares de
-# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Guerrero-Aguirre et al.,
+# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Penuela-Martinez et al.,
 # 2025, Avances Tecnicos Cenicafe), de modo que cada grano recibe
 # practicamente el aire/sol del ambiente y la ecuacion de capa delgada de
 # Roa se aplica directamente, sin el modelo por capas que exige el lecho de
 # 20 cm del secador electrico. Area necesaria: 80 / 7.2 = 11.1 m2 (antes
 # 12.8 m2 por densidad aparente), frente a 1.28 m2 del secador electrico
 # (dato para CAPEX).
-AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Guerrero-Aguirre et al., 2025)
+AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Penuela-Martinez et al., 2025)
 ESPESOR_CAPA_DELGADA_M = 0.02
 
 import generador_ambiente as _amb

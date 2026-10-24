@@ -3,7 +3,7 @@
 Script: `python/validacion_modelo.py` (reproduce todos los números).
 
 **Criterio:** solo cuentan como validación los datos que **no** se usaron
-para construir ni calibrar el modelo. Se valida en cuatro tipos de secado
+para construir ni calibrar el modelo. Se valida en tres tipos de secado
 distintos, para no apoyarse en un solo caso.
 
 | Pieza del modelo | Usada en |
@@ -17,9 +17,14 @@ distintos, para no apoyarse en un solo caso.
 | # | Tipo de secado | Fuente (independiente) | Dato real | Modelo | Error |
 |---|---|---|---|---|---|
 | V1 | Capa delgada en laboratorio, 9 condiciones (50–70 °C, 10–30 % HR) | Phitakwinai et al. (2019), *Food Sci. Nutr.* 7(9) | Tiempo hasta MR = 0.2: 5.9–14.5 h | 5.4–14.3 h | **7.2 % medio**, RMSE 0.76 h (≤ 2 % a 50 °C; hasta −19 % a 70 °C) |
-| V2 | Patio al sol, condiciones medias | Resende et al. (2009), café robusta, Brasil | 117.5 h | 125.6 h | **+6.9 %** |
-| V3 | Secador mecánico de lecho estático (30 cm, 125 kg, 48 °C, 15 h/día, inversión cada 7.5 h) | Martínez-Tovar & Álvarez-Hernández (2006), *Cenicafé* 57(2) — Escafé | ~3 d; 7 297 kJ/kg agua; capas 8.4–12.7 % | 1.7–2.3 d; **6 962–8 560 kJ/kg**; capas 9.3–10.4 % | Tiempo **−25 a −45 %**; energía **−5 a +17 %** |
-| V4 | Secado solar, grupo de 1 061–1 399 h/año de sol (predicho, no calibrado) | Guerrero-Aguirre et al. (2025), Avances Técnicos Cenicafé | 15.5 d (rango 5.2–36.1) | 11.7 d | **−24 %**, dentro del rango |
+| V2 | Secador mecánico de lecho estático (30 cm, 125 kg, 48 °C, 15 h/día, inversión cada 7.5 h) | Martínez-Tovar & Álvarez-Hernández (2006), *Cenicafé* 57(2) — Escafé | ~3 d; 7 297 kJ/kg agua; capas 8.4–12.7 % | 1.7–2.3 d; **6 962–8 560 kJ/kg**; capas 9.3–10.4 % | Tiempo **−25 a −45 %**; energía **−5 a +17 %** |
+| V3 | Secado solar, grupo de 1 061–1 399 h/año de sol (predicho, no calibrado) | Peñuela-Martínez et al. (2025), Avances Técnicos Cenicafé | 15.5 d (rango 5.2–36.1) | 11.7 d | **−24 %**, dentro del rango |
+
+**Caso excluido (antes V2): patio al sol de Resende et al. (2009).** Su humedad final, 10 % b.s., está por
+debajo del equilibrio de Roa a 26,3 °C y 63,3 % HR constantes (12,6 % b.s.): con aire constante el modelo
+nunca llega a ese valor, y sin el calentamiento solar del grano el caso no es comparable. La versión anterior
+reportaba +6,9 %, pero ese número salía de un valor de respaldo del script (MR = 0,05), no de la humedad final
+medida, así que se retiró (corrección del asesor, 23 oct 2026). Detalle: `resende_2009_secado_patio.md`.
 
 Contraste adicional (no son validación estricta, ver sección 2):
 
@@ -31,8 +36,7 @@ Contraste adicional (no son validación estricta, ver sección 2):
 ## 2. Interpretación
 
 1. **La cinética (lo que comparten las 3 estrategias) está validada:** error
-   medio de 7 % en laboratorio y de 7 % en patio, con datos de otros países y
-   otra especie. A 70 °C el modelo es hasta 19 % más rápido, pero la
+   medio de 7 % en laboratorio, con datos de otro país. A 70 °C el modelo es hasta 19 % más rápido, pero la
    supervisada trabaja a 50 °C, donde el error es ≤ 2 %.
 2. **La energía del secador mecánico está validada:** contra el Escafé, el
    modelo da entre −5 y +17 % del consumo específico medido. Es el resultado
@@ -59,19 +63,19 @@ una incertidumbre de ±30–45 % que depende de la configuración y no tiene
 sesgo. Como la propuesta supervisada es de 4 a 8 veces más rápida que las
 solares, esa incertidumbre no cambia la conclusión de la comparación.
 
-## 3. Supuestos propios en V3 y V4
+## 3. Supuestos propios en V2 y V3
 
-- V3: caudal real a través del lecho deducido de la presión del ventilador
+- V2: caudal real a través del lecho deducido de la presión del ventilador
   (10 mm c.a.) con la ecuación de Boyce & Pérez-Fonrodona → 0.117 m³/min/kg.
   El dato de 1.15 m³/s es el caudal nominal del ventilador, no el que pasa
   por 30 cm de café. Estufa encendida de 05:00 a 20:00. Humedad inicial de
   44, 48 y 53 % b.h. (la fuente no la da con precisión).
-- V4: calentamiento solar efectivo escalado con las horas de sol
+- V3: calentamiento solar efectivo escalado con las horas de sol
   (4.4 °C × 1 230/1 600 = 3.38 °C).
 
 ## 4. Referencias
 
-- Phitakwinai, P., Thepa, S., & Nilnont, W. (2019). Thin-layer drying of
+- Phitakwinai, S., Thepa, S., & Nilnont, W. (2019). Thin-layer drying of
   parchment Arabica coffee by controlling temperature and relative humidity.
   *Food Science & Nutrition, 7*(9), 2921–2931. https://doi.org/10.1002/fsn3.1144
 - Resende et al. (2009): ver `resende_2009_secado_patio.md`.
@@ -79,8 +83,8 @@ solares, esa incertidumbre no cambia la conclusión de la comparación.
   de la energía calórica de estufas campesinas para el secado del café en
   fincas. *Cenicafé, 57*(2), 88–99.
   https://www.cenicafe.org/es/publications/arc057%2802%29088-099.pdf
-- Guerrero-Aguirre, Á., Sanz-Uribe, J. R., Peñuela-Martínez, A. E., &
-  Osorio-G., C. V. (2025). *Manejo del café en el secado solar* (Avances
+- Peñuela-Martínez, A. E., Osorio-Giraldo, C. V., Guerrero-Aguirre, Á., &
+  Sanz-Uribe, J. R. (2025). *Manejo del café en el secado solar* (Avances
   Técnicos No. 577). Cenicafé. https://doi.org/10.38141/10779/0577
 - Oliveros-Tascón, C. E., Ramírez-Gómez, C. A., Sanz-Uribe, J. R.,
   Peñuela-Martínez, A. E., & Pabón-Usaquén, J. (2013). Secado solar y

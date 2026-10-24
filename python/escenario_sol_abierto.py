@@ -14,7 +14,7 @@ el mismo de las otras dos estrategias; solo cambian las condiciones de
 aire que recibe el cafe. El patio recibe el ambiente de Chinchina
 (``generador_ambiente.py``) mas un incremento solar diurno sobre la
 temperatura del grano, de maximo ``DT_MAX_PATIO_C`` = 4.4 C, calibrado
-contra los 10.6 dias de secado solar de Cenicafe (Guerrero-Aguirre et
+contra los 10.6 dias de secado solar de Cenicafe (Penuela-Martinez et
 al., 2025). Detalle de la calibracion en el bloque de comentarios de
 abajo.
 
@@ -24,9 +24,9 @@ escenario_sol_abierto.py`` imprime el mapa de calibracion.
 
 Referencias
 -----------
-- Guerrero-Aguirre, A., Sanz-Uribe, J. R., Penuela-Martinez, A. E., &
-  Osorio-G., C. V. (2025). Manejo del cafe en el secado solar. Avances
-  Tecnicos Cenicafe. https://doi.org/10.38141/10779/0577
+- Penuela-Martinez, A. E., Osorio-Giraldo, C. V., Guerrero-Aguirre, A., &
+  Sanz-Uribe, J. R. (2025). Manejo del cafe en el secado solar (Avances
+  Tecnicos No. 577). Cenicafe. https://doi.org/10.38141/10779/0577
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ import numpy as np
 # ------------------------------------------------------------------------
 # Se calibra con datos colombianos de Cenicafe.
 #
-# Fuente: Guerrero-Aguirre, A., Sanz-Uribe, J. R., Penuela-Martinez, A. E., &
-# Osorio-G., C. V. (2025). Manejo del cafe en el secado solar. Avances
-# Tecnicos Cenicafe. https://doi.org/10.38141/10779/0577
+# Fuente: Penuela-Martinez, A. E., Osorio-Giraldo, C. V., Guerrero-Aguirre, A., &
+# Sanz-Uribe, J. R. (2025). Manejo del cafe en el secado solar (Avances
+# Tecnicos No. 577). Cenicafe. https://doi.org/10.38141/10779/0577
 #   - Capacidad de diseno: 7.2 kg c.p.s. por m2, capa de 2.0 cm.
 #   - Humedad final 10-12 % b.h. (se usa 11 %).
 #   - Tiempo de secado solar con 1 400-1 800 h/ano de brillo solar:
@@ -86,21 +86,21 @@ import numpy as np
 # Las tres estrategias secan el MISMO lote: 80 kg de cafe pergamino seco
 # (158 kg humedos a 55 % b.h.). En secado solar el cafe se extiende en
 # CAPA DELGADA de 2 cm (capacidad de diseno de los secadores solares de
-# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Guerrero-Aguirre et al.,
+# Cenicafe: 7.2 kg c.p.s./m2 con capa de 2.0 cm; Penuela-Martinez et al.,
 # 2025, Avances Tecnicos Cenicafe), de modo que cada grano recibe
 # practicamente el aire/sol del ambiente y la ecuacion de capa delgada de
 # Roa se aplica directamente, sin el modelo por capas que exige el lecho de
 # 20 cm del secador electrico. Area necesaria: 80 / 7.2 = 11.1 m2 (antes
 # 12.8 m2 por densidad aparente), frente a 1.28 m2 del secador electrico
 # (dato para CAPEX).
-AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Guerrero-Aguirre et al., 2025)
+AREA_CAPA_DELGADA_M2 = 80.0 / 7.2   # 11.1 m2: 7.2 kg c.p.s./m2 (Penuela-Martinez et al., 2025)
 ESPESOR_CAPA_DELGADA_M = 0.02       # 2.0 cm (misma fuente)
 
 import generador_ambiente as _amb
 import cinetica_roa as _roa
 
 DT_MAX_PATIO_C = 4.4   # C, calibrado contra Cenicafe 2025 (ver bloque de arriba)
-TIEMPO_CENICAFE_SOLAR_H = 10.6 * 24.0  # 254.4 h (Guerrero-Aguirre et al., 2025)
+TIEMPO_CENICAFE_SOLAR_H = 10.6 * 24.0  # 254.4 h (Penuela-Martinez et al., 2025)
 
 
 def condiciones_patio(clima_dias, dt_max_c: float = DT_MAX_PATIO_C):

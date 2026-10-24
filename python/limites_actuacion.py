@@ -150,7 +150,8 @@ def main() -> None:
     L += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in lim]
     L += ["", f"Potencia requerida por la Ec. 5 a 50 °C (T_amb 14.3 °C, FS 1.1): "
           f"{potencia_requerida_kw(p0):.2f} kW; a 55 °C: "
-          f"{potencia_requerida_kw(replace(p0, t_setpoint_c=55.0)):.2f} kW (> 6 kW instalados).", "",
+          f"{potencia_requerida_kw(replace(p0, t_setpoint_c=55.0)):.2f} kW con FS (> 6 kW instalados; "
+          f"{potencia_requerida_kw(replace(p0, t_setpoint_c=55.0)) / 1.1:.2f} kW nominales, sin FS).", "",
           "## 1. Barrido: 10 perfiles en clima nominal (C0) y frío (CT-, p5), arranque 00:00", ""]
     L += tabla([f for f in filas if f["caso"] == "barrido"], cols)
     L += ["", "## 2. Caso más exigente", "", f"Seleccionado del barrido en CT- por horas de saturación y, a igualdad, por el menor margen físico: "

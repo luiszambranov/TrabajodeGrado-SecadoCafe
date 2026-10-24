@@ -1,15 +1,6 @@
-// GVL_SECUENCIA — Variables compartidas entre FluidSIM (OPC), la HMI,
-// el programa SECUENCIA y PLC_PRG.
-// Todas deben estar marcadas en "Symbol configuration" para que el
-// servidor OPC de CODESYS las publique a FluidSIM.
-//
-//   - sin_fluidsim: TRUE = el PLC simula pulsadores de campo y cilindros (pruebas sin FluidSIM).
-//   - lote_preparado arranca en TRUE: al iniciar el servidor ya hay un lote nuevo,
-//     así que START funciona sin pulsar "Nuevo lote".
-//   - I_FLUIDSIM_PULSO (INPUT0.7): pulso de vida opcional que genera FluidSIM (oscilador con dos
-//     temporizadores). Un final de carrera estable no prueba que el enlace esté vivo; un
-//     bit que cambia sí.
-//   - fluidsim_estado: lo publica SECUENCIA y PLC_PRG lo envía a Python (registro 40).
+// GVL_SECUENCIA — Variables globales compartidas entre FluidSIM (OPC), la HMI,
+// SECUENCIA y PLC_PRG. Todas deben estar marcadas en "Symbol configuration" para que
+// el servidor OPC de CODESYS las publique a FluidSIM.
 //
 // Intercambio con FluidSIM por OPC: un BYTE por módulo de 8 bits.
 //   INPUT0  <- bloque "FluidSIM Out" (pulsadores, finales de carrera) -> se lee INPUT0.n
@@ -17,7 +8,7 @@
 // En SECUENCIA se copian bit a bit a las variables I_ / Q_ con nombre.
 VAR_GLOBAL
     // ===== Modo de prueba =====
-    sin_fluidsim    : BOOL := FALSE;  // FALSE por defecto = E/S de FluidSIM (demo y ensayos F1-F5).
+    sin_fluidsim    : BOOL := FALSE;  // FALSE = E/S de FluidSIM (demostración y ensayos de falla).
                                       // TRUE = sin FluidSIM, el PLC emula pulsadores y cilindros (pruebas).
                                       // Se puede cambiar en línea en cualquier momento (Ctrl+F7).
 
@@ -33,7 +24,7 @@ VAR_GLOBAL
     I_1B2           : BOOL;   // INPUT0.4  Cilindro 1 (compuerta) adelante -> aire invertido
     I_2B1           : BOOL;   // INPUT0.5  Cilindro 2 (bandeja) atrás   -> bandeja afuera
     I_2B2           : BOOL;   // INPUT0.6  Cilindro 2 (bandeja) adelante -> bandeja adentro
-    I_FLUIDSIM_PULSO: BOOL;   // INPUT0.7  pulso de vida de FluidSIM (cambia cada ~1 s)
+    I_FLUIDSIM_PULSO: BOOL;   // INPUT0.7  Pulso de vida de FluidSIM (cambia cada ~1 s)
 
     // ===== Salidas con nombre (se copian a OUTPUT0.n) =====
     Q_1S1           : BOOL;   // OUTPUT0.0 Bobina: cilindro 1 sale (compuerta -> invertida)
@@ -66,6 +57,6 @@ VAR_GLOBAL
     nuevo_lote      : BOOL;   // pulso de un ciclo al pulsar "Nuevo lote" (PLC_PRG reinicia Python)
     lote_preparado  : BOOL := TRUE;   // TRUE al arrancar; START solo arranca si está en TRUE
 
-    // ===== enlace con FluidSIM (SECUENCIA -> PLC_PRG -> Python, registro 40) =====
+    // ===== Enlace con FluidSIM (SECUENCIA -> PLC_PRG -> Python, registro 40) =====
     fluidsim_estado : WORD;   // 1 = vivo, 2 = modo sin_fluidsim declarado, 3 = enlace caído
 END_VAR

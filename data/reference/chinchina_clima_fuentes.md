@@ -38,8 +38,8 @@ anual (≈ 16,5 MJ/m²/día); de 4 295 (octubre) a 4 999 Wh/m²/día (marzo).
 
 ## 4. Secado solar en Colombia (calibración de las líneas base)
 
-Fuente: Guerrero-Aguirre, Á., Sanz-Uribe, J. R., Peñuela-Martínez, A. E., &
-Osorio-G., C. V. (2025). *Manejo del café en el secado solar* (Avances
+Fuente: Peñuela-Martínez, A. E., Osorio-Giraldo, C. V., Guerrero-Aguirre, Á., &
+Sanz-Uribe, J. R. (2025). *Manejo del café en el secado solar* (Avances
 Técnicos No. 577). Cenicafé. https://doi.org/10.38141/10779/0577
 
 | Dato | Valor | Uso |

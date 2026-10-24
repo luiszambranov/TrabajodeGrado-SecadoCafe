@@ -2,11 +2,11 @@
 //   - Convierte los registros Modbus (2 WORD -> REAL), vigila el heartbeat de Python
 //     (comm_error), detecta el fin del secado y publica relojes y estado de la planta
 //     (registros 27-39) para la HMI. Envía a Python el estado del enlace con FluidSIM (registro 40).
-//   - Perfil térmico y caudal elegidos en la HMI:
-//     perfil_sel: 0 = REF 50 °C, 1 = P1 45 °C, 2 = P2 50 -> 35 °C, 3 = P3 35 -> 50 °C.
+//     Con STOP, falla o fin de secado, la planta en Python sigue enfriándose y el clima sigue su ciclo.
+//   - perfil_sel (HMI): 0 = REF 50 °C, 1 = P1 45 °C, 2 = P2 50 -> 35 °C, 3 = P3 35 -> 50 °C.
 //     El cambio de P2/P3 ocurre cuando la humedad PROMEDIO del lote llega a 30 % b.h.
 //     (de Oliveira et al., 2018; diseño en python/perfiles_termicos.py).
-//     caudal_sel: 30, 75 o 100 %.
+//   - caudal_sel (HMI): 30, 75 o 100 %.
 //   - Ambos se toman SOLO en REPOSO; al pulsar START quedan fijos todo el lote (perfil_activo,
 //     caudal_activo), como en el diseño experimental.
 //   - El PLC calcula la consigna y la envía a Python (registro 26, setpoint_cmd), que la usa
@@ -53,7 +53,7 @@ VAR
     conv_RH_process : U_WORDS_TO_REAL;
     RH_process      : REAL;                   // % HR dentro de la cámara
 
-    // =====  =====
+    // ===== Sentido del aire, capa más húmeda y ciclo de la resistencia =====
     flow_dir_cmd      : WORD;                  // canal FC06, dir 15
     M_coffee_max_raw  : ARRAY[0..1] OF WORD;   // [0] <- dir 16 (_hi), [1] <- dir 17 (_lo)
     conv_mcoffee_max  : U_WORDS_TO_REAL;
@@ -62,13 +62,13 @@ VAR
     conv_duty         : U_WORDS_TO_REAL;
     heater_duty       : REAL;                  // % del ciclo con la resistencia encendida
 
-    // ===== manipulada 2, caudal variable =====
+    // ===== Manipulada 2: caudal variable =====
     fan_speed_pct     : WORD := 100;           // canal FC06, dir 20: consigna de caudal 30-100 % (HMI)
     caudal_raw        : ARRAY[0..1] OF WORD;   // [0] <- dir 22 (_hi), [1] <- dir 23 (_lo)
     conv_caudal       : U_WORDS_TO_REAL;
     caudal_m3_min     : REAL;                  // caudal real aplicado (8.0 = 100 %)
 
-    // =====  =====
+    // ===== Selector de caudal, nuevo lote y energía =====
     caudal_sel        : INT := 100;            // selector de la HMI (cuadro combinado): 30, 75 o 100 %
     reset_lote_cmd    : WORD;                  // canal FC06, dir 21: pulso "Nuevo lote" hacia Python
     tp_reset          : TP;                    // mantiene el pulso 3 s para que Python lo vea
@@ -76,7 +76,7 @@ VAR
     conv_energia      : U_WORDS_TO_REAL;
     energia_kWh       : REAL;                  // energía eléctrica del lote (resistencia + ventilador)
 
-    // ===== perfiles térmicos =====
+    // ===== Perfiles térmicos =====
     perfil_sel        : INT := 0;              // selector HMI: 0 REF, 1 P1, 2 P2, 3 P3
     perfil_activo     : INT := 0;              // copia fija durante el lote
     caudal_activo     : INT := 100;            // copia fija durante el lote
@@ -86,7 +86,7 @@ VAR
     setpoint_cmd      : WORD;                  // canal FC06, dir 26: consigna hacia Python (°C enteros)
     perfil_txt        : STRING(40);            // texto para la HMI
 
-    // ===== relojes y estado de la planta (Python -> CODESYS) =====
+    // ===== Relojes y estado de la planta (Python -> CODESYS) =====
     t_lote_raw        : ARRAY[0..1] OF WORD;   // [0] <- dir 27 (_hi), [1] <- dir 28 (_lo)
     t_secado_ef_raw   : ARRAY[0..1] OF WORD;   // [0] <- dir 29, [1] <- dir 30
     t_parado_raw      : ARRAY[0..1] OF WORD;   // [0] <- dir 31, [1] <- dir 32
@@ -111,8 +111,6 @@ VAR
     periodo_txt       : STRING(8);             // 'DIA' / 'NOCHE'
     fluidsim_estado_cmd : WORD;                // canal FC06, dir 40: estado del enlace FluidSIM hacia Python
     fluidsim_txt      : STRING(20);
-    datos_validos     : BOOL;                  // FALSE = sin comunicación con Python, valores vencidos
-    txt_datos         : STRING(60);            // aviso para la HMI
     hh                : INT;
     mm                : INT;
 
@@ -208,22 +206,13 @@ ELSE
     periodo_txt := 'NOCHE';
 END_IF
 
-// marcar los datos vencidos. Si Python no responde, los valores que se
-// ven en la HMI son los últimos recibidos y NO deben parecer una medición válida.
-datos_validos := NOT comm_error AND (safety_ok = 1);
-IF datos_validos THEN
-    txt_datos := '';
-ELSE
-    txt_datos := 'DATOS VENCIDOS - sin comunicacion con Python';
-END_IF
-
 // Estado del enlace FluidSIM hacia Python (lo calcula SECUENCIA en el ciclo anterior)
 fluidsim_estado_cmd := GVL_SECUENCIA.fluidsim_estado;
 CASE GVL_SECUENCIA.fluidsim_estado OF
     1: fluidsim_txt := 'OK';
-    2: fluidsim_txt := 'SIN FLUIDSIM (emulado)';
+    2: fluidsim_txt := 'SIN FLUIDSIM';
     3: fluidsim_txt := 'SIN ENLACE';
-    0: fluidsim_txt := 'FLUIDSIM (sin vigilar)';
+    0: fluidsim_txt := 'FLUIDSIM';
 ELSE
     fluidsim_txt := '-';
 END_CASE
@@ -258,7 +247,7 @@ ELSE
 END_IF
 setpoint_cmd := REAL_TO_WORD(setpoint);
 
-// consigna de caudal fija del lote
+// Consigna de caudal fija del lote
 fan_speed_pct := INT_TO_WORD(caudal_activo);
 // Consigna de caudal limitada a 30-100 % (mínimo de operación del ventilador)
 IF fan_speed_pct > 100 THEN fan_speed_pct := 100; END_IF
@@ -282,7 +271,7 @@ reset_lote_cmd := BOOL_TO_WORD(tp_reset.Q);
 // ================== FIN DE SECADO (enclavado) ==================
 // Promedio <= 11 % b.h. Y capa más húmeda <= 12 % b.h. (SECAFÉ, 2008).
 // M_coffee > 0 evita disparar con el registro aún en 0.0 al arrancar.
-// no se enclava mientras dura el pulso de nuevo lote (Python aún publica el lote anterior).
+// No se enclava mientras dura el pulso de nuevo lote (Python aún publica el lote anterior).
 IF (NOT tp_reset.Q) AND (M_coffee > 0.0) AND (M_coffee <= 11.0)
    AND (M_coffee_max > 0.0) AND (M_coffee_max <= 12.0) THEN
     fin_secado := TRUE;
@@ -301,15 +290,15 @@ en_marcha  := GVL_SECUENCIA.ventilador AND NOT comm_error;
 fan_cmd := BOOL_TO_WORD(en_marcha);
 
 IF lazo_local THEN
-    // Python regula a 50 °C cada segundo de modelo; el PLC solo da el permiso.
+    // Python regula a la consigna cada segundo de modelo; el PLC solo da el permiso.
     heater_cmd := BOOL_TO_WORD(en_marcha AND GVL_SECUENCIA.calentar);
 ELSE
     // Todo/nada en el PLC: válido SOLO a tiempo real (factor 1).
     heater_cmd := BOOL_TO_WORD(en_marcha AND GVL_SECUENCIA.calentar AND (T_process < setpoint));
 END_IF
 
-// el sentido del aire sale de la POSICIÓN REAL de la compuerta (final de carrera 1B2
-// en FluidSIM), no del reloj. El reloj de 6 h (SECAFÉ, 2008) está ahora en SECUENCIA.
+// El sentido del aire sale de la POSICIÓN REAL de la compuerta (final de carrera 1B2
+// en FluidSIM), no del reloj. El reloj de 6 h (SECAFÉ, 2008) está en SECUENCIA.
 flow_dir_cmd := BOOL_TO_WORD(GVL_SECUENCIA.aire_invertido AND NOT comm_error);
 
 // ================== AUXILIARES HMI ==================

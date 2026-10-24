@@ -1,4 +1,4 @@
-# Secado en patio — caso V2 de la validación del modelo
+# Secado en patio — caso excluido de la validación del modelo
 
 Fuente:
 
@@ -10,10 +10,11 @@ Fuente:
 
 ## Uso en el proyecto
 
-Es el caso **V2** de la validación independiente (`validacion_modelo.md`,
-`python/validacion_modelo.py`): café secado directamente al sol en patio, sin
-calentamiento ni ventilación forzada. No se usa para calibrar ningún parámetro;
-la línea base solar pasiva se calibra con Cenicafé (`python/escenario_sol_abierto.py`).
+Era el caso V2 de la validación independiente y se **retiró** el 23 oct 2026
+(ver abajo): café secado directamente al sol en patio, sin calentamiento ni
+ventilación forzada. No se usa para calibrar ningún parámetro; la línea base
+solar pasiva se calibra con Cenicafé (`python/escenario_sol_abierto.py`). En el
+documento solo se cita como dato de contexto (117,5 h en patio).
 
 ## Condiciones reportadas
 
@@ -26,7 +27,13 @@ la línea base solar pasiva se calibra con Cenicafé (`python/escenario_sol_abie
 | Tiempo total de secado | 117,5 h (~4,9 días), igual para los 4 clones |
 | Modelo de mejor ajuste (los autores) | Page (R² ≥ 0,9997) |
 
-## Resultado de la validación
+## Por qué se retiró
 
-El modelo de Roa–Cenicafé a 26,3 °C y 63,3 % HR constantes, desde 1,355 hasta
-0,10 b.s., tarda 125,6 h frente a las 117,5 h medidas (+6,9 %).
+La humedad final de Resende et al., 0,10 b.s. (10 % b.s.), está por debajo de
+la humedad de equilibrio de Roa–Cenicafé a 26,3 °C y 63,3 % HR constantes,
+12,59 % b.s. (`caso_excluido_resende()` en `python/validacion_modelo.py`). Con
+aire constante el modelo nunca llega a ese valor: en el patio el grano se
+calienta al sol por encima del aire y baja más, efecto que no entra con las
+condiciones medias reportadas. La versión anterior daba 125,6 h (+6,9 %), pero
+ese valor salía de un respaldo del script (MR = 0,05, unos 18,7 % b.s.), no de
+la humedad final medida, así que no es una comparación válida.

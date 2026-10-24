@@ -13,7 +13,7 @@ Generado por `python/limites_actuacion.py`. Misma física y control que la campa
 | Temperatura máxima alcanzable | T_amb + P/(ṁ·cp + UA) | Caudal 100 %: T_amb + 42.5 °C; 75 %: T_amb + 56.3 °C; 30 %: T_amb + 135 °C | Balance del plenum (Ec. 5) |
 | Compuerta | Cambia de sentido solo con posición confirmada (final de carrera 1B1/1B2) | Tiempo máximo de maniobra 5 s (T_MOV_MAX); sin confirmación → FALLA 2. En la planta Python la inversión del aire es instantánea (simplificación declarada: 5 s frente a 6 h) | codesys/SECUENCIA.st |
 
-Potencia requerida por la Ec. 5 a 50 °C (T_amb 14.3 °C, FS 1.1): 5.53 kW; a 55 °C: 6.30 kW (> 6 kW instalados).
+Potencia requerida por la Ec. 5 a 50 °C (T_amb 14.3 °C, FS 1.1): 5.53 kW; a 55 °C: 6.30 kW con FS (> 6 kW instalados; 5.73 kW nominales, sin FS).
 
 ## 1. Barrido: 10 perfiles en clima nominal (C0) y frío (CT-, p5), arranque 00:00
 

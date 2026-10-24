@@ -74,7 +74,7 @@ fuentes en `data/reference/roa_cenicafe_isoterma_capa_delgada.md`); solo
 cambian las condiciones de aire que recibe el café. El incremento solar de
 cada línea base se calibró contra literatura (datos de Cenicafé): solar pasiva 4.4 °C, para reproducir los 10.6 días de
 secado solar de Cenicafé con 1 400–1 800 h/año de brillo solar
-(Guerrero-Aguirre et al., 2025); solar activa 12.5 °C (reducción de 47.5 %
+(Peñuela-Martínez et al., 2025); solar activa 12.5 °C (reducción de 47.5 %
 frente a la pasiva, dentro del 30–50 % de Duque-Dussán et al., 2026 y del
 40–50 % de Meja et al., 2025; incremento dentro de 10–25 °C). Fuentes y
 detalle en `data/reference/chinchina_clima_fuentes.md`. Ver los
@@ -90,7 +90,7 @@ docstrings de `escenario_sol_abierto.py` y `linea_base_activa.py`.
 | Fuente de calor | Sol sobre el grano (ΔT efectivo 4.4 °C) | Sol en cámara (ΔT efectivo 12.5 °C) | Resistencia de 6 kW, 50 °C |
 
 La capa de 2 cm es la capacidad estándar de los secadores solares de Cenicafé
-(Guerrero-Aguirre et al., 2025). El lecho de 20 cm es el menor espesor evaluado
+(Peñuela-Martínez et al., 2025). El lecho de 20 cm es el menor espesor evaluado
 por González et al. (2010) para secado mecánico estático.
 
 ## 3. Modelo, no CFD
@@ -110,5 +110,5 @@ consistente con la recomendación de mantener un modelo de complejidad acotada.
 5. Solar drying technology for agricultural products: A review. https://arccjournals.com/journal/agricultural-reviews/R-2457
 6. Mathematical modeling of greenhouse solar dryers with natural and forced convection for agricultural products: state of the art. https://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S2007-40262017000100019
 7. Design and optimization of an active and passive mode indirect solar dryer to improve energy efficiency and sustainability. *International Journal of Low-Carbon Technologies.* https://academic.oup.com/ijlct/article/doi/10.1093/ijlct/ctag056/8703217
-8. Guerrero-Aguirre, A., Sanz-Uribe, J. R., Peñuela-Martínez, A. E., & Osorio-G., C. V. (2025). Manejo del café en el secado solar. *Avances Técnicos Cenicafé*. https://publicaciones.cenicafe.org/index.php/avances_tecnicos/article/view/4247
+8. Peñuela-Martínez, A. E., Osorio-Giraldo, C. V., Guerrero-Aguirre, Á., & Sanz-Uribe, J. R. (2025). Manejo del café en el secado solar. *Avances Técnicos Cenicafé*. https://publicaciones.cenicafe.org/index.php/avances_tecnicos/article/view/4247
 9. González S., C. A., Sanz U., J. R., & Oliveros T., C. E. (2010). Control de caudal y temperatura de aire en el secado mecánico de café. *Cenicafé, 61*(4), 281–296. https://biblioteca.cenicafe.org/handle/10778/503

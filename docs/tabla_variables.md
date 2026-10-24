@@ -90,9 +90,9 @@ CODESYS declara `comm_error` y apaga sus comandos.
 | Tiro natural (ventilador apagado) | ΔP = g·H·Δρ, H = 0.6 m; resistencia lineal anclada en 100 Pa a 8 m³/min | ASHRAE (2021); ASABE D272; `reposo_tiro_natural.md` |
 | Pérdidas del lecho en reposo | h = 4 W/m²K sobre 2.2 m² | Incropera et al. (2007); criterio propio |
 | Post-ventilación ante fallo de comunicación | 10 min de modelo | Criterio propio declarado |
-| Incremento solar pasiva | 4.4 °C máx. | Calibrado con Guerrero-Aguirre et al. (2025): 10.6 días |
+| Incremento solar pasiva | 4.4 °C máx. | Calibrado con Peñuela-Martínez et al. (2025): 10.6 días |
 | Incremento solar activa | 12.5 °C máx. | Reducción 47.5 % vs. pasiva (Duque-Dussán et al., 2026; Meja et al., 2025) |
-| Área solar | 11.1 m² (7.2 kg c.p.s./m², capa de 2 cm) | Guerrero-Aguirre et al. (2025) |
+| Área solar | 11.1 m² (7.2 kg c.p.s./m², capa de 2 cm) | Peñuela-Martínez et al. (2025) |
 | Extractor de la activa | 40 W, 06:00–18:00 | S&P HCM-225N; Madhava et al. (2017) |
 | Radiación media | 4.582 kWh/m²/día | Cenicafé 54(2) |
 

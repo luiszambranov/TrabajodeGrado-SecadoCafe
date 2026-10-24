@@ -59,19 +59,19 @@ Caudal 100 % = 8 m³/min. Ningún perfil supera los 50 °C permitidos para el gr
 | P3-C75 (35 → 50 °C, 75 %) | 55,2 h | 1,42 kWh/kg c.p.s. | Cumple; 19,0 % menos energía que REF |
 | Caudal 30 % | 80–99 h | 0,99–1,07 kWh/kg c.p.s. | No cumple: sobreseca la capa de entrada |
 
-REF, P1-C75 y P3-C75 forman la frontera de Pareto tiempo–energía con una tolerancia de 9 % b.h. en la capa más seca; con 10 % solo cumplirían P2-C100 y P3-C100. Detalle:
+REF, P1-C75 y P3-C75 forman la frontera de Pareto tiempo–energía con una tolerancia de 9 % b.h. en la capa más seca (criterio propio); con 10 % ningún perfil alcanza el 95 % de realizaciones exigido (el más cercano, P2-C100, llega a 90 %). Detalle:
 [`python/resultados/campana/resumen_resultados.md`](python/resultados/campana/resumen_resultados.md).
 
 ## Evaluación financiera preliminar (5 años, 12 % real, 40 lotes/año)
 
 Implementación recomendada: controlador CODESYS WAGO Compact Controller 100 con HMI web (WebVisu),
 actuador eléctrico y el mismo programa del proyecto. La máquina trabaja sola: reemplaza la supervisión
-manual del secado (horas calculadas a partir de la simulación).
+manual del secado (horas calculadas a partir de la simulación; el muestreo final de humedad sigue siendo manual y no se cuenta).
 
 | Alternativa | Inversión incremental | VPN | TIR | Recuperación descontada |
 |---|---|---|---|---|
-| A: automatizar un secador existente | 11,8 M COP | +10,2 M COP | 41,7 % | 2,5 años |
-| B: secador nuevo automatizado frente a uno manual | 9,5 M COP | +12,5 M COP | 56,2 % | 1,9 años |
+| A: automatizar un secador existente | 11,8 M COP | +8,3 M COP | 36,7 % | 2,8 años |
+| B: secador nuevo automatizado frente a uno manual | 9,5 M COP | +10,7 M COP | 50,2 % | 2,1 años |
 | Sistema completo frente a seguir secando al sol | 16,8 M COP | −21,1 M COP | — | No se recupera |
 
 Supuestos, fuentes y flujos: [`python/resultados/financiero/`](python/resultados/financiero/).

@@ -1,5 +1,4 @@
-// DUT (Enumeración) — Estados de la máquina de estados del secador
-// Crear en CODESYS: Application > Agregar objeto > DUT > Enumeración, nombre E_ESTADO
+// E_ESTADO — Estados de la máquina de estados del secador (DUT, enumeración)
 {attribute 'qualified_only'}
 {attribute 'strict'}
 TYPE E_ESTADO :

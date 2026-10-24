@@ -41,7 +41,7 @@ energía y restricciones de calidad) a CUÁNDO y CUÁNTO calor se aplica.
   frente a P2 (altas al inicio y bajas después).
   El cambio al 30 % b.h. es el que usaron de Oliveira et al. (2018), y
   coincide con la separación entre presecado y secado final de Cenicafé
-  (Guerrero-Aguirre et al., 2025).
+  (Peñuela-Martínez et al., 2025).
 - Caudal 30/75/100 %: el ventilador y la carga térmica de la resistencia
   dependen del caudal (la potencia para calentar el aire es proporcional al
   caudal); se busca si reducir caudal ahorra energía sin sobresecar la capa
@@ -80,7 +80,7 @@ Referencias
 - Oliveros T., C. E., Pabón U., J. P., & Montoya R., E. C. (2016). Evaluación
   de una alternativa para la conservación de la calidad en la
   comercialización del café húmedo. Cenicafé.
-- Guerrero-Aguirre et al. (2025); Oliveros et al. (2013): ver
+- Peñuela-Martínez et al. (2025); Oliveros et al. (2013): ver
   data/reference/validacion_modelo.md.
 """
 

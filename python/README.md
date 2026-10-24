@@ -54,7 +54,7 @@ réplica del PLC (para Monte Carlo), así que los dos ven exactamente la misma p
 
 | Archivo | Qué hace | Comando |
 |---|---|---|
-| `escenario_sol_abierto.py` | **PASIVA**: secado al sol en patio, capa de 2 cm, con un incremento solar de 4,4 °C calibrado para dar los 10,6 días de Cenicafé (Guerrero-Aguirre et al., 2025). | `python escenario_sol_abierto.py` (imprime la calibración) |
+| `escenario_sol_abierto.py` | **PASIVA**: secado al sol en patio, capa de 2 cm, con un incremento solar de 4,4 °C calibrado para dar los 10,6 días de Cenicafé (Peñuela-Martínez et al., 2025). | `python escenario_sol_abierto.py` (imprime la calibración) |
 | `linea_base_activa.py` | **ACTIVA**: secador solar con ventilación forzada, incremento de 12,5 °C (47,5 % menos tiempo que la pasiva, dentro del 30–50 % de Duque-Dussán et al., 2026). | `python linea_base_activa.py` |
 | `control_supervisado.py` | **SUPERVISADA**: réplica en Python de la lógica de `PLC_PRG` y `SECUENCIA` (termostato todo/nada cada 1 s, inversión del aire cada 6 h, fin con promedio ≤ 11 % y capa más húmeda ≤ 12 % b.h.). Calcula también IAE, ISE, sobreimpulso y error de temperatura. | Se usa desde otros scripts |
 | `perfiles_termicos.py` | Define los 10 perfiles supervisados (REF y P1/P2/P3 × caudal 30/75/100 %) con la fuente de cada nivel. | `python perfiles_termicos.py` (tabla con el día nominal) |
@@ -123,7 +123,7 @@ figura en `../figures/`.
 | `corrida_instrumentada.py` | La corrida supervisada registrada minuto a minuto (consigna, temperatura lograda, potencia, ciclo de trabajo, saturación). La usa `limites_actuacion.py`. | — |
 | `balance_energia.py` | Energía eléctrica, solar y por kg de agua de las tres estrategias en el día nominal. | Imprime la tabla |
 | `analisis_financiero.py` | Evaluación financiera preliminar: VPN, TIR y recuperación (simple y descontada) de la adaptación (A) y del sistema completo (B) en escenarios conservador, central y favorable; valor presente del cambio REF → P1-C75; sensibilidad de un factor a la vez y costo académico de la asesoría. Cada dato está marcado como dato (con fuente) o supuesto. | `resultados/financiero/flujos_financieros.xlsx` (con fórmulas VNA y TIR) y `resumen.md` |
-| `validacion_modelo.py` | Compara el modelo con 4 casos independientes: laboratorio (Phitakwinai et al., 2019), patio (Resende et al., 2009), secador Escafé (Martínez-Tovar y Álvarez, 2006) y secado solar (Guerrero-Aguirre et al., 2025). | Imprime la tabla; detalle en `../data/reference/validacion_modelo.md` |
+| `validacion_modelo.py` | Compara el modelo con 3 casos independientes: laboratorio (Phitakwinai et al., 2019), secador Escafé (Martínez-Tovar y Álvarez, 2006) y secado solar (Peñuela-Martínez et al., 2025). Imprime también por qué se excluyó el patio de Resende et al. (2009): su humedad final está bajo el equilibrio del modelo. | Imprime la tabla; detalle en `../data/reference/validacion_modelo.md` |
 | `graficas_perfiles.py` | Figuras de cada perfil térmico en el día nominal, con el instante de cambio de consigna. | `../figures/perfil_*.png`, `perfiles_resumen.png` |
 
 ## 7. Pruebas con CODESYS y FluidSIM

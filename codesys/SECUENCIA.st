@@ -1,11 +1,8 @@
 // =====================================================================
 // SECUENCIA — Máquina de estados del secador de café (CASE OF)
 // Proyecto: Supervisión IoT del secado de café (CODESYS V3.5 SP9)
-//   Estados de operación, pulsadores de campo y HMI, cilindros de FluidSIM, ventilador,
-//   semáforo, post-ventilación en PARO y FALLA, EMERGENCIA con todas las salidas en cero,
-//   inversión del aire con el tiempo de secado efectivo (registro 29) y vigilancia del
-//   enlace con FluidSIM (falla 5). La física de la planta no depende de este programa:
-//   Python sigue integrando aunque CODESYS o FluidSIM se detengan.
+// La física de la planta NO depende de este programa: Python sigue integrando aunque
+// CODESYS o FluidSIM se detengan.
 //
 // Llamar en la MainTask DESPUÉS de PLC_PRG:
 //   MainTask: 1) PLC_PRG   (lee Python por Modbus, watchdog, fin_secado)
@@ -33,9 +30,9 @@ VAR
     falla_fc         : BOOL;   // los dos finales de carrera de un cilindro activos a la vez
     falla_fluidsim   : BOOL;   // el pulso de vida de FluidSIM dejó de cambiar
     tmr_fs           : TON;    // vigila el pulso de vida de FluidSIM
-    pulso_fs_anterior: BOOL;
+    pulso_fs_anterior: BOOL;   // valor anterior del pulso de vida
 
-    // --- post-ventilación (resistencia en 0, ventilador sigue un tiempo) ---
+    // --- Post-ventilación (resistencia en 0, ventilador sigue un tiempo) ---
     calentaba        : BOOL;   // la resistencia tenía permiso justo antes de la parada
     pv_activa        : BOOL;   // hay post-ventilación pendiente en PARO / FALLA
     t_pv_ini_h       : REAL;   // tiempo de planta al empezar la post-ventilación
@@ -80,7 +77,7 @@ VAR
     lim_objetivo     : REAL := 11.0;  // línea de referencia en la tendencia
     lim_capa         : REAL := 12.0;  // línea de referencia en la tendencia
 
-    // --- modo de E/S aplicado (copia de sin_fluidsim que solo cambia sin movimiento) ---
+    // --- Modo de E/S aplicado (copia de sin_fluidsim que solo cambia sin movimiento) ---
     modo_sim         : BOOL := TRUE;  // TRUE = E/S emuladas por el PLC; FALSE = E/S de FluidSIM
     modo_sim_ant     : BOOL := TRUE;
     txt_modo         : STRING(50);    // texto para la HMI
@@ -93,7 +90,7 @@ VAR
     obj_band_adentro : BOOL;          // posición objetivo de la bandeja al sincronizar
     obj_comp_inv     : BOOL;          // posición objetivo de la compuerta al sincronizar
 
-    // --- simulación de cilindros cuando sin_fluidsim = TRUE ---
+    // --- Simulación de cilindros cuando sin_fluidsim = TRUE ---
     sim_comp_inv     : BOOL;          // TRUE = compuerta invertida (1B2)
     sim_band_adentro : BOOL;          // TRUE = bandeja adentro (2B2)
 END_VAR
@@ -105,7 +102,7 @@ VAR CONSTANT
     T_FS_MAX                  : TIME := T#5S;   // sin cambio del pulso de FluidSIM en 5 s -> enlace caído
     VIGILAR_PULSO_FS          : BOOL := FALSE;  // poner TRUE cuando el oscilador KT1/KT2 esté armado en
                                                 // FluidSIM (entrada 7). Con FALSE no se vigila el enlace
-                                                // (Python recibe 0 = no informado) y el ensayo F2 no aplica.
+                                                // (Python recibe 0 = no informado).
     PERIODO_INVERSION_H       : DINT := 6;      // SECAFÉ (2008)
     PAUSA_RESIST_EN_INVERSION : BOOL := FALSE;  // FALSE en la demo acelerada (factor 540);
                                                 // TRUE solo en la verificación a tiempo real
@@ -114,7 +111,7 @@ END_VAR
 // =====================================================================
 // 0. LECTURA DE FLUIDSIM (INPUT0 <- bloque "FluidSIM Out") o SIMULACIÓN
 // =====================================================================
-// el modo se aplica DE INMEDIATO, en cualquier estado . Al pasar a FluidSIM,
+// El modo se aplica DE INMEDIATO, en cualquier estado. Al pasar a FluidSIM,
 // el PLC SINCRONIZA: mueve los cilindros de FluidSIM hasta la posición que tenía la simulación
 // (sección 5). Al volver a emulado, el PLC parte de la última posición real leída de FluidSIM.
 modo_sim := GVL_SECUENCIA.sin_fluidsim;
@@ -217,7 +214,7 @@ start_pulso := rt_start.Q;
 rt_nuevo(CLK := GVL_SECUENCIA.hmi_nuevo_lote);
 
 // STOP y EMERGENCIA son NC: el contacto abierto (FALSE) significa pulsado.
-// si el ENLACE con FluidSIM está caído (entradas muertas), esos contactos no se interpretan
+// Si el ENLACE con FluidSIM está caído (entradas muertas), esos contactos no se interpretan
 // como pulsados: la máquina va a FALLA 5 (recuperable, resistencia en 0 y post-ventilación) en
 // lugar de EMERGENCIA. Un pulsador realmente oprimido con el enlace vivo sigue funcionando,
 // porque los finales de carrera mantienen INPUT0 distinto de cero.
@@ -229,7 +226,7 @@ compuerta_invertida := GVL_SECUENCIA.I_1B2 AND NOT GVL_SECUENCIA.I_1B1;
 compuerta_normal    := GVL_SECUENCIA.I_1B1 AND NOT GVL_SECUENCIA.I_1B2;
 
 // Reloj de inversión: cada 6 h de SECADO EFECTIVO cambia el sentido pedido.
-// usa el registro 29 (horas con calentamiento permitido) para que la post-ventilación
+// Usa el registro 29 (horas con calentamiento permitido) para que la post-ventilación
 // de un PARO no corra el reloj de inversión.
 t_lote_h := PLC_PRG.t_secado_efectivo_h - t0_lote_h;
 IF t_lote_h < 0.0 THEN
@@ -255,7 +252,7 @@ en_ciclo := (GVL_SECUENCIA.estado = E_ESTADO.CARGA)
 // =====================================================================
 // 3. PRIORIDADES: EMERGENCIA > FALLA > PARO (antes del CASE)
 // =====================================================================
-// ¿la resistencia tenía permiso justo antes? (salida del ciclo anterior)
+// ¿La resistencia tenía permiso justo antes? (salida del ciclo anterior)
 calentaba := GVL_SECUENCIA.calentar;
 
 IF emergencia THEN
@@ -265,7 +262,7 @@ IF emergencia THEN
 ELSIF en_ciclo AND (falla_comm OR falla_fluidsim OR falla_fc OR tmr_mov.Q) THEN
     pv_activa  := calentaba;            // post-ventilación si venía calentando
     t_pv_ini_h := PLC_PRG.t_planta_h;
-    // recordar dónde iba el lote para la recuperación (ensayo F4). Si la falla llega
+    // Recordar dónde iba el lote para la recuperación. Si la falla llega
     // estando en PARO, se conserva el estado_previo que ya tenía el PARO.
     IF GVL_SECUENCIA.estado <> E_ESTADO.PARO THEN
         estado_previo := GVL_SECUENCIA.estado;
@@ -311,7 +308,7 @@ E_ESTADO.REPOSO:
     ELSIF start_pulso AND GVL_SECUENCIA.lote_preparado
           AND NOT stop_activo AND NOT falla_comm AND NOT falla_fc AND NOT falla_fluidsim
           AND NOT sincronizando THEN
-        // es un ENCLAVAMIENTO DE MÁQUINA (no arrancar sin E/S de campo), no una pausa de la
+        // Es un ENCLAVAMIENTO DE MÁQUINA (no arrancar sin E/S de campo), no una pausa de la
         // física: Python sigue integrando la planta con o sin CODESYS/FluidSIM.
         GVL_SECUENCIA.estado := E_ESTADO.CARGA;
     END_IF
@@ -357,21 +354,21 @@ E_ESTADO.DESCARGA:
 
 E_ESTADO.PARO:
     // Amarilla fija. START (con STOP ya suelto) continúa donde iba.
-    // no reanuda mientras se sincronizan los cilindros de FluidSIM.
+    // No reanuda mientras se sincronizan los cilindros de FluidSIM.
     IF start_pulso AND NOT stop_activo AND NOT sincronizando THEN
         GVL_SECUENCIA.estado := estado_previo;
     END_IF
 
 E_ESTADO.FALLA:
     // Roja intermitente. START reconoce la falla si la causa ya desapareció.
-    // el lote NO se reinicia. El primer START
+    // Recuperación controlada: el lote NO se reinicia. El primer START
     // reconoce la falla y deja la máquina en PARO; un segundo START reanuda donde iba
     // (mismo lote, misma energía y mismo reloj de inversión). Python nunca dejó de integrar.
     IF start_pulso AND NOT falla_comm AND NOT falla_fc AND NOT falla_fluidsim
        AND NOT entradas_muertas THEN
         GVL_SECUENCIA.falla_codigo := 0;
         GVL_SECUENCIA.estado := E_ESTADO.PARO;
-        // si FluidSIM se cayó, al reiniciarse sus cilindros vuelven a la posición inicial
+        // Si FluidSIM se cayó, al reiniciarse sus cilindros vuelven a la posición inicial
         // del circuito: se llevan a la última posición válida antes de reanudar.
         IF resinc_pendiente THEN
             obj_band_adentro := ult_band_adentro;
@@ -394,7 +391,7 @@ END_CASE
 // 5. SALIDAS: se calculan a partir del estado (nada queda "pegado")
 // =====================================================================
 // --- Interfaz con PLC_PRG / Python ---
-// POLÍTICA DE PARADA 
+// POLÍTICA DE PARADA (Tabla C1 del documento)
 //   - PARO y FALLA: resistencia en cero de inmediato; si venía calentando, el ventilador
 //     sigue T_POSTVENT_H para sacar el calor del ducto (evita sobretemperatura de los
 //     elementos) y luego se apaga. Si la falla es la comunicación con Python, CODESYS no

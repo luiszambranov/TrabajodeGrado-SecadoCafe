@@ -107,7 +107,6 @@ activa con la constante `VIGILAR_PULSO_FS := TRUE` en `SECUENCIA`.
 | Hora y día/noche, temperatura ambiente | `PLC_PRG.hora_txt`, `periodo_txt`, `T_ambiente` |
 | Estado físico de la planta / enlace FluidSIM | `PLC_PRG.estado_planta_txt`, `PLC_PRG.fluidsim_txt` |
 | Estado de la máquina / alarma / comunicación | `GVL_SECUENCIA.estado_txt`, `SECUENCIA.txt_alarma`, `SECUENCIA.txt_comm` |
-| Aviso de datos vencidos | `PLC_PRG.txt_datos`, `PLC_PRG.datos_validos` |
 | Piloto «Bandeja adentro» | `SECUENCIA.piloto_bandeja_adentro` |
 
 El perfil y el caudal se aceptan solo en REPOSO y quedan fijos durante el lote. La
