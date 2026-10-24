@@ -8,7 +8,7 @@ FluidSIM por OPC.
 
 | Archivo | Qué es |
 |---|---|
-| `archivo_codesys/SecadoCafe_Terminado.project` | Proyecto completo de CODESYS (aplicación, IO Mapping Modbus, HMI, configuración de símbolos para OPC). Es el que se abre para ejecutar el sistema. |
+| `archivo_codesys/SecadoCafe_TerminadoFINAL.project` | Proyecto completo de CODESYS (aplicación, IO Mapping Modbus, HMI, configuración de símbolos para OPC). Es el que se abre para ejecutar el sistema. |
 | `PLC_PRG.st` | Programa de comunicación con la planta: convierte registros Modbus a REAL, vigila el heartbeat de Python, calcula la consigna del perfil térmico, detecta el fin del secado y prepara los textos y relojes de la HMI. |
 | `SECUENCIA.st` | Máquina de estados (CASE OF): REPOSO, CARGA, SECADO, INVERSIÓN, ENFRIAMIENTO, FIN DE SECADO, DESCARGA, PARO, FALLA y EMERGENCIA; mandos, cilindros, ventilador, semáforo, post-ventilación y vigilancia del enlace con FluidSIM. |
 | `GVL_SECUENCIA.st` | Variables globales compartidas entre FluidSIM (OPC), la HMI, `SECUENCIA` y `PLC_PRG`. |
@@ -24,7 +24,7 @@ texto para leerlo sin abrir CODESYS.
 1. Arrancar la planta: en `python/`, `python modbus_server.py` (puerto 5020).
 2. Iniciar CODESYS Control Win V3 (bandeja del sistema → *Start PLC*). La versión del
    runtime debe ser la misma del IDE (SP9).
-3. Abrir `archivo_codesys/SecadoCafe_Terminado.project`, en *Device* elegir el PLC
+3. Abrir `archivo_codesys/SecadoCafe_TerminadoFINAL.project`, en *Device* elegir el PLC
    local (*Establecer ruta activa*), compilar, iniciar sesión con descarga, *Reiniciar en
    frío* y RUN. MainTask llama primero `PLC_PRG` y luego `SECUENCIA`.
 4. Abrir `fluidsim/SecadoCafeFLM.ct` en FluidSIM e iniciar la simulación (servidor OPC
