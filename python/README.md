@@ -125,6 +125,7 @@ figura en `../figures/`.
 | `analisis_financiero.py` | Evaluación financiera preliminar: VPN, TIR y recuperación (simple y descontada) de la adaptación (A) y del sistema completo (B) en escenarios conservador, central y favorable; valor presente del cambio REF → P1-C75; sensibilidad de un factor a la vez y costo académico de la asesoría. Cada dato está marcado como dato (con fuente) o supuesto. | `resultados/financiero/flujos_financieros.xlsx` (con fórmulas VNA y TIR) y `resumen.md` |
 | `validacion_modelo.py` | Compara el modelo con 3 casos independientes: laboratorio (Phitakwinai et al., 2019), secador Escafé (Martínez-Tovar y Álvarez, 2006) y secado solar (Peñuela-Martínez et al., 2025). Imprime también por qué se excluyó el patio de Resende et al. (2009): su humedad final está bajo el equilibrio del modelo. | Imprime la tabla; detalle en `../data/reference/validacion_modelo.md` |
 | `graficas_perfiles.py` | Figuras de cada perfil térmico en el día nominal, con el instante de cambio de consigna. | `../figures/perfil_*.png`, `perfiles_resumen.png` |
+| `figuras_documento.py` | Figuras 1 (arquitectura) y 3 (Pareto tiempo–energía) del documento final, en escala de grises; la 3 se calcula desde `resultados/campana/resultados.csv`. | `../figures/fig1_arquitectura.png`, `fig3_pareto.png` |
 
 ## 7. Pruebas con CODESYS y FluidSIM
 

@@ -86,7 +86,7 @@ Supuestos, fuentes y flujos: [`python/resultados/financiero/`](python/resultados
 | [`codesys/`](codesys/) | Proyecto de CODESYS, programas en texto (`.st`), mapa de canales Modbus, HMI y ensayos de falla. |
 | [`fluidsim/`](fluidsim/) | Circuito electroneumático y su enlace OPC. |
 | [`data/`](data/) | Serie de clima NASA POWER y fuentes de cada parámetro del modelo, cotizaciones y validación. |
-| [`docs/`](docs/) | Tabla de variables, selección de líneas base y diagramas de la arquitectura. |
+| [`docs/`](docs/) | Tabla de variables, selección de líneas base, diagramas de la arquitectura y bitácora de uso de IA ([`docs/bitacora_ia.md`](docs/bitacora_ia.md)). |
 | [`figures/`](figures/) | Figuras del documento. |
 
 ## Cómo ejecutarlo

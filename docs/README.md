@@ -8,3 +8,4 @@
 | `diagrama_arquitectura.py` | Genera el diagrama anterior. Uso: `python diagrama_arquitectura.py` (requiere `pip install cairosvg`). |
 | `diagrama_simulacion.png` / `.svg` / `.pdf` | Diagrama completo de la simulación: bloques, variables que intercambian, registros Modbus y señales OPC. |
 | `diagrama_simulacion.py` | Genera el diagrama anterior. Uso: `python diagrama_simulacion.py` (requiere `cairosvg`). |
+| `bitacora_ia.md` | Bitácora de uso de inteligencia artificial: estructura del repositorio, README, organización de datos, código en Python, esquemas y tablas, y cómo se verificó lo generado. |

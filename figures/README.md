@@ -5,6 +5,8 @@ capturas de pantalla.
 
 | Archivo | Qué muestra |
 |---|---|
+| `fig1_arquitectura.png` | Figura 1 del documento: arquitectura implementada y flujo de información, en escala de grises con símbolos de diagrama de flujo (`figuras_documento.py`). |
+| `fig3_pareto.png` | Figura 3 del documento: frontera de Pareto tiempo–energía de los perfiles supervisados, a partir de las 150 realizaciones de la campaña (`figuras_documento.py`). |
 | `perfiles_resumen.png` | Consigna de los cuatro perfiles (REF, P1, P2, P3) en función de la humedad del lote (`graficas_perfiles.py`). |
 | `perfil_REF.png` | Perfil de referencia de Cenicafé en el día nominal: temperatura del aire, consigna, ambiente, humedad del lote y de las capas, y franjas con el aire invertido (`graficas_perfiles.py`). |
 | `perfil_P1.png`, `perfil_P2.png`, `perfil_P3.png` | Cada perfil con los tres caudales: temperatura, humedad y el instante del cambio de consigna en P2 y P3 (`graficas_perfiles.py`). |
@@ -15,8 +17,8 @@ capturas de pantalla.
 | `ensayos_fallos_F1_F2_F3.png` | Ensayos de falla con CODESYS y FluidSIM: CODESYS detenido, FluidSIM detenido y STOP desde la HMI (`graficas_ensayos.py`). |
 | `ensayo_continuidad_fisica.png` | La planta sigue evolucionando durante un paro, una pérdida de comunicación y la recuperación (`ensayo_continuidad_fisica.py`). |
 | `lote_codesys_P3C100.png` | Lote completo P3-C100 supervisado por CODESYS y FluidSIM: temperatura, humedad por capas, potencia y caudal (`grafica_lote.py`, generada por el servidor). |
-| `hmi_secado.png` | Captura de la HMI de CODESYS al terminar un lote. |
+| `hmi_secado_REF_v8.png` | Captura de la HMI de CODESYS durante un lote REF (Figura 2 del documento). |
 
-Las figuras de la campaña Monte Carlo (convergencia, cajas y Pareto) están en
+Las demás figuras de la campaña Monte Carlo (convergencia, cajas y el Pareto original) están en
 `python/resultados/campana/`; el circuito de FluidSIM en `fluidsim/` y los diagramas
 de la arquitectura en `docs/`.
